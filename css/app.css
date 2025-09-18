@@ -1,0 +1,26 @@
+:root{--brand:#0EA5E9;--accent:#F59E0B;--bg:#0f1115;--panel:#171a21;--text:#e8eef9;--muted:#9aa3b2;--ring:#243b53;}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 system-ui,Segoe UI,Roboto,Arial}
+.app-header{position:sticky;top:0;z-index:5;display:flex;gap:12px;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--ring);backdrop-filter:blur(8px)}
+.app-header h1{margin:0;font-size:16px;color:var(--brand)}
+.app-header nav button{background:#0f1320;border:1px solid var(--ring);color:var(--text);padding:8px 10px;border-radius:10px;cursor:pointer}
+.screen{display:none;padding:14px;max-width:980px;margin:0 auto}
+.screen.active{display:block}
+.panel{background:var(--panel);border:1px solid var(--ring);border-radius:12px;padding:12px;margin-bottom:12px;box-shadow:0 6px 24px rgba(0,0,0,.25)}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:720px){.row{grid-template-columns:1fr}}
+.btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+button{appearance:none;border:1px solid var(--ring);background:#0f1320;color:var(--text);padding:10px 12px;border-radius:10px;cursor:pointer;font-weight:600}
+button.primary{background:color-mix(in srgb, var(--brand) 22%, #0f1320 78%);border-color:#1e78a8}
+button.danger{background:color-mix(in srgb, #ef4444 22%, #0f1320 78%);border-color:#7a2a2a}
+button.good{background:color-mix(in srgb, #22c55e 22%, #0f1320 78%);border-color:#2e7d60}
+input,select{width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--ring);background:#0f1320;color:var(--text)}
+.canvas-wrap{display:flex;justify-content:center;align-items:center;min-height:50vh}
+canvas{display:block;width:100%;height:auto;border-radius:12px;background:#111}
+.list{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.list li{display:flex;justify-content:space-between;gap:8px;align-items:center;background:#0f1320;border:1px solid var(--ring);padding:8px 10px;border-radius:10px}
+.meter{height:10px;border-radius:999px;background:#0d1220;border:1px solid var(--ring);overflow:hidden;margin-top:8px}
+.meter>i{display:block;height:100%;width:0%;background:linear-gradient(90deg,var(--brand),var(--accent))}
+.hint{color:var(--muted);font-size:12px}
+.tiny{color:var(--muted);font-size:12px}
