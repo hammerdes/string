@@ -127,7 +127,13 @@ function bindCrop(){
 
     const im = octx.getImageData(0,0,SIZE,SIZE);
     const src=im.data; const gray=new Uint8Array(SIZE*SIZE);
-    for(let j=0,i=0;i<src.length;i+=4,j++) gray[j] = (0.2126*src[i] + 0.7152*src[i+1] + 0.0722*src[i+2])|0;
+    const GAMMA = 1/1.05;
+    for(let j=0,i=0;i<src.length;i+=4,j++){
+      let y = 0.2126*src[i] + 0.7152*src[i+1] + 0.0722*src[i+2];
+      y = Math.pow(y/255, GAMMA) * 255;
+      y = Math.min(255, Math.max(0, y));
+      gray[j] = y|0;
+    }
 
     const blob = new Blob([gray], {type:'application/octet-stream'});
     const proj = State.get().project;
