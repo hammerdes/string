@@ -4,8 +4,34 @@ self.onmessage = async (e)=>{
   const {type, data} = e.data;
   if(type==='run'){
     paused=false; canceled=false;
-    const opts = { size:data.size, fade:data.fade, minDist:data.minDist, maxSteps:data.maxSteps, progressThrottle:0.02 };
-    const onProgress=(step,score)=>{ if(paused||canceled) return; self.postMessage({type:'progress', data:{step, max:opts.maxSteps, score, progress: step/opts.maxSteps}}); };
+    const opts = {
+      size: data.size,
+      fade: data.fade,
+      minDist: data.minDist,
+      maxSteps: Math.max(1, data.maxSteps|0),
+      progressThrottle: 0.02
+    };
+    const previewStepStride = Math.max(1, Math.round(opts.maxSteps * Math.max(opts.progressThrottle*2, 0.04)));
+    let lastPreviewStep = 0;
+    let sentPins = false;
+    const onProgress = (step, score, steps, pins)=>{
+      if(paused||canceled) return;
+      const payload = { step, max: opts.maxSteps, score, progress: step/opts.maxSteps };
+      const hasPreviewSteps = steps && typeof steps.length === 'number' && steps.length;
+      const shouldSendPreview = hasPreviewSteps && (lastPreviewStep===0 || step - lastPreviewStep >= previewStepStride);
+      if(shouldSendPreview){
+        const stepsView = Uint16Array.from(steps);
+        payload.steps = stepsView;
+        payload.size = opts.size;
+        lastPreviewStep = step;
+        if(!sentPins && pins){ payload.pins = pins; sentPins = true; }
+      }
+      if(payload.steps){
+        self.postMessage({type:'progress', data: payload}, [payload.steps.buffer]);
+      }else{
+        self.postMessage({type:'progress', data: payload});
+      }
+    };
     const res = await runGreedyLoop(new Uint8ClampedArray(data.raster), data.pins, opts, onProgress);
     if(!canceled) self.postMessage({type:'result', data:{ steps:[0, ...res.steps.map(s=>s.to)], residual:res.residual, durationMs:res.durationMs, pins:res.pins, size:res.size }});
   }else if(type==='pause'){ paused = true; }
