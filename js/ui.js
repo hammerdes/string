@@ -17,9 +17,71 @@ function refreshProjectList(){
   State.listProjects().forEach(p=>{
     const li=document.createElement('li');
     li.innerHTML=`<span>${p.name}</span><span class="tiny">${new Date(p.updatedAt).toLocaleString()}</span>`;
-    li.addEventListener('click', ()=>{ State.setProject(p); State.go(3); });
+    li.addEventListener('click', ()=>{ State.setProject(p); hydrateProjectView(); State.go(3); });
     ul.appendChild(li);
   });
+}
+
+function hydrateProjectView(){
+  const p = State.get().project;
+  if(!p) return;
+
+  const params = p.params || {};
+  const setValue = (id, value)=>{
+    if(value===undefined || value===null) return;
+    const el = document.getElementById(id);
+    if(!el) return;
+    el.value = value;
+  };
+
+  setValue('p-pins', params.pins);
+  setValue('p-steps', params.strings);
+  if('minAngle' in params) setValue('p-angle', params.minAngle);
+  else if('angle' in params) setValue('p-angle', params.angle);
+  setValue('p-mindist', params.minDist);
+  setValue('p-fade', params.fade);
+  setValue('p-seed', params.seed);
+  setValue('p-width', params.widthPx);
+  setValue('p-alpha', params.alpha);
+  setValue('p-color', params.color);
+  setValue('p-board', params.board);
+
+  const slider=document.getElementById('e4-step');
+  const counter=document.getElementById('e4-count');
+  const renderCanvas=document.getElementById('render-canvas');
+  const viewerCanvas=document.getElementById('viewer-canvas');
+
+  const stepsCSV=(p.stepsCSV||'').trim();
+  const steps=stepsCSV ? stepsCSV.split(',').map(s=>Number(s)).filter(n=>Number.isFinite(n)) : [];
+  const pinsValue = params.pins ?? (document.getElementById('p-pins')?.value);
+  const pinCount = Number(pinsValue);
+  const hasPins = Number.isFinite(pinCount) && pinCount>0;
+
+  if(renderCanvas){
+    if(steps.length>0 && hasPins && p.size){
+      const pins=buildPins(p.size, pinCount);
+      renderPinsAndStrings(renderCanvas, p.size, pins, steps, params);
+    } else {
+      const ctx=renderCanvas.getContext('2d');
+      if(ctx) ctx.clearRect(0,0,renderCanvas.width, renderCanvas.height);
+    }
+  }
+
+  const maxStep = steps.length>0 ? steps.length-1 : 0;
+  if(slider){
+    slider.max = maxStep;
+    slider.value = maxStep;
+  }
+  if(counter){
+    counter.textContent = steps.length + ' steps';
+  }
+
+  if(steps.length>0 && hasPins && p.size){
+    drawViewer(maxStep);
+  } else if(viewerCanvas){
+    const vctx=viewerCanvas.getContext('2d');
+    if(vctx) vctx.clearRect(0,0,viewerCanvas.width, viewerCanvas.height);
+  }
 }
 
 async function onPickImage(e){
@@ -138,8 +200,17 @@ function bindGenerate(){
         previewState.size = data.size;
         previewState.lastCount = data.steps.length;
         previewState.renderedStep = data.steps.length-1;
-        document.getElementById('e4-step').max=data.steps.length-1;
-        document.getElementById('e4-count').textContent=(data.steps.length-1)+' steps';
+        const sliderEl=document.getElementById('e4-step');
+        const counterEl=document.getElementById('e4-count');
+        const maxStep=Math.max(data.steps.length-1,0);
+        if(sliderEl){
+          sliderEl.max=maxStep;
+          sliderEl.value=maxStep;
+          if(data.steps.length>0) drawViewer(maxStep);
+        }
+        if(counterEl){
+          counterEl.textContent=data.steps.length + ' steps';
+        }
       } else if(type==='status'){
         if(data.state==='paused'){
           stat.textContent='Paused';
@@ -193,9 +264,15 @@ function bindViewer(){
 
 function drawViewer(k){
   const p=State.get().project; if(!p) return;
-  const canvas=document.getElementById('viewer-canvas');
-  const steps=p.stepsCSV.split(',').map(s=>+s).slice(0, k+1);
-  const pins=buildPins(p.size, p.params.pins);
+  const stepsCSV=(p.stepsCSV||'').trim();
+  if(!stepsCSV) return;
+  const canvas=document.getElementById('viewer-canvas'); if(!canvas) return;
+  const allSteps=stepsCSV.split(',').map(s=>Number(s)).filter(n=>Number.isFinite(n));
+  if(allSteps.length===0) return;
+  const pinCount=Number(p.params?.pins);
+  if(!Number.isFinite(pinCount) || pinCount<=0 || !p.size) return;
+  const steps=allSteps.slice(0, Math.min(k+1, allSteps.length));
+  const pins=buildPins(p.size, pinCount);
   renderPinsAndStrings(canvas, p.size, pins, steps, p.params);
 }
 
