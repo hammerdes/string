@@ -107,6 +107,7 @@ export async function runGreedyLoop(imageData, pins, options, onProgress){
   const engine = new EngineCore({ size: options.size, fade: options.fade, minDist: options.minDist, pins, raster: imageData });
   const maxSteps = options.maxSteps|0;
   const steps = []; let lastProgress = 0;
+  const yieldStride = options.yieldStride|0;
   for(let k=0;k<maxSteps;k++){
     if(options.shouldCancel && options.shouldCancel()) break;
     if(options.waitWhilePaused) await options.waitWhilePaused();
@@ -117,6 +118,9 @@ export async function runGreedyLoop(imageData, pins, options, onProgress){
     if(onProgress && p - lastProgress >= (options.progressThrottle||0.02)){
       lastProgress = p;
       onProgress(k+1, st.score, engine.steps.slice(), engine.pins);
+    }
+    if(options.yieldToQueue && yieldStride>0 && ((k+1)%yieldStride)===0){
+      await options.yieldToQueue();
     }
   }
   const t1 = performance.now();

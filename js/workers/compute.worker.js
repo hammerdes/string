@@ -3,6 +3,8 @@ import { runGreedyLoop } from '../engine.js';
 
 let paused = false, canceled = false;
 const pauseResolvers = [];
+const yieldToQueue = () => new Promise((resolve) => setTimeout(resolve, 0));
+const YIELD_STRIDE = 512;
 
 const flushResolvers = () => {
   while (pauseResolvers.length) {
@@ -36,6 +38,8 @@ self.onmessage = async (e) => {
       progressThrottle: 0.02,
       waitWhilePaused,
       shouldCancel: () => canceled,
+      yieldToQueue,
+      yieldStride: YIELD_STRIDE,
     };
 
     // Önizleme gönderim aralığı (adım sayısına ve throttle'a göre)
