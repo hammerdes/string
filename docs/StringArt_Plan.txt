@@ -1,0 +1,138 @@
+StringArt — Project Brief & Implementation Plan (LLM‑oriented)
+Date: 2025‑09‑10
+
+TERMINOLOGY & SCOPE
+- “CORE ENGINE” (a.k.a. algorithm): grayscale raster → circular pin layout → line pixel sampling → scoring/nextPin → residual update (fade) → greedy loop → steps[].
+- “Raster”: the single square grayscale image (SIZE×SIZE) produced in Screen E2 and reused unchanged in E3/E4.
+- Goal: Build a 4‑screen, mobile‑first web app, later packaged with Capacitor to APK/AAB. Use v1’s CORE ENGINE only; UI/flow will be rebuilt for the 4‑screen design.
+
+DECISION LOG
+- Use v1’s CORE ENGINE (clean re‑implementation of greedy). (v1 is the html file named as "stringart_v1.html"
+- Screen E2 produces the ONLY source raster (+ circle meta); E3/E4 must use the exact same SIZE and circle parameters.
+- Visual alpha (drawing) ≠ fade (residual math). Alpha is purely cosmetic; fade alters residual.
+
+4‑SCREEN FLOW (FUNCTIONAL)
+E1 — Home
+  - “Upload Photo” and “My Projects” (local IndexedDB list).
+  - New project → pick image → E2. Existing project → resume at last known screen.
+E2 — Crop (Circular Mask)
+  - Pinch‑zoom/drag inside a circular frame to set composition.
+  - “Confirm” → produce the canonical raster (SIZE×SIZE, grayscale, optional invert) + circle meta {cx,cy,r}.
+  - Store view transform {scale, tx, ty} as reference.
+E3 — Parameters & Generate
+  - Same SIZE and circle frame; photo is visible initially.
+  - “Generate” → hide photo, draw strings (v1 behavior). “Regenerate” after param changes uses the SAME raster.
+  - Optional: quick preview SIZE vs. final SIZE (switchable).
+E4 — Step Viewer & Save
+  - Same frame/SIZE. Start empty; as user advances 0→k, draw each step line by line.
+  - Outputs: PNG export, steps CSV, “Save/Continue” (project stored in IndexedDB).
+
+INVARIANTS (MUST HOLD)
+- Single canonical raster and circle across E2/E3/E4 (no resampling after E2).
+- Engine sampling grid equals drawing grid (respect devicePixelRatio consistently).
+- Determinism optional via seed for line variation (visual only).
+
+CORE ENGINE (MODULE/WORKER API DRAFT)
+init(input)
+  input: {
+    raster: Uint8Array | Uint8ClampedArray | ImageData, // grayscale 0–255
+    size: number,           // SIZE
+    pins: number,           // e.g., 180–300
+    minDist: number,        // dynamic suggestion: round(pins*0.06–0.10)
+    fade: number,           // 1–100; 40–60 is balanced
+    widthPx?: number, alpha?: number, var?: number, pinSize?: number, // drawing only
+    color?: string, board?: 'white'|'black'                             // drawing only
+  }
+precompute()
+  - Circular pins (equal angular spacing). Build line‑pixel cache for pin pairs (Bresenham). Consider LRU if memory bound.
+step() → boolean
+  - One greedy step: choose nextPin by score (sum/avg of 255−residual along the line), update residual by fade, push to steps[].
+run(nSteps, onProgress?) → { done:boolean }
+  - Incremental stepping; cancellable.
+getSteps() → number[]
+render(kSteps, opts?) → HTMLCanvasElement | ImageData
+  - Draw k steps inside the circular clip (purely visual; does not touch residual).
+
+ALGORITHM DETAILS (v1‑based)
+- Pin layout: N pins on a circle (center & radius from E2 circle meta).
+- Sampling: Bresenham integer pixel trace; cache results per pin pair.
+- Scoring: sum or average of (255 − residual) along the line (average recommended to balance short/long chords).
+- Constraints: minDist window; avoid reusing the same pin pair; continuity (single thread of string).
+- Residual update: for each pixel on the chosen line, residual = min(255, residual + fade).
+
+E2 → RASTER PIPELINE
+1) User composition with circular mask (pinch‑zoom/drag).
+2) Offscreen canvas → square output (SIZE×SIZE).
+3) Apply circular clip/alpha mask (outside treated as 255/white for residual logic).
+4) Convert to grayscale luminance; apply invert if color/board requires.
+5) Persist: raster (byte array or ImageData) + circle meta {cx,cy,r}.
+
+DATA MODEL (PERSISTENCE)
+Project {
+  id: string, name: string, createdAt: number, updatedAt: number,
+  rasterBlobId: string, size: number,
+  circle: { cx:number, cy:number, r:number },
+  view: { scale:number, tx:number, ty:number }, // E2 reference only
+  params: {
+    pins:number, strings:number, minDist:number, fade:number,
+    alpha:number, widthPx:number, var:number, pinSize:number,
+    color:string, board:'white'|'black'
+  },
+  stepsCSV?: string, stepCount?: number
+}
+- Storage: IndexedDB (raster blob + JSON meta). E1 lists projects from this store.
+
+PERFORMANCE & ARCHITECTURE
+- Web Worker isolates CORE ENGINE; UI thread does rendering only.
+- Line‑cache (pin‑pair → pixel list) with LRU if memory pressure occurs.
+- Optional multi‑resolution: fast preview SIZE vs. final SIZE; ensure preview/final use the same E2 composition.
+- Cancellable run(): keep engine responsive on mobile.
+
+TESTING & ACCEPTANCE
+- Golden fixtures: small input rasters with deterministic seeds → fixed steps arrays.
+- Performance target: ~200 pins, ~2–3k steps on mid‑tier mobile within acceptable time.
+- Visual consistency: same circle/SIZE across E2/E3/E4; regenerate with same raster yields same result (if seed fixed).
+- CSV/PNG validation: CSV order matches physical winding; PNG matches render(k).
+
+RISKS & MITIGATIONS
+- Raster/SIZE drift → enforce single SIZE; propagate circle meta verbatim.
+- Anti‑alias discrepancies → use canvas clip for circle; keep engine on integer grid.
+- Over‑restrictive minDist → scale with pins (≈6–10% of pins).
+- Fade/alpha confusion → document separation; UI hints (alpha is visual only).
+
+ROADMAP
+0) App skeleton: state/router (screen = 1|2|3|4).
+1) Extract CORE ENGINE (module + worker) from v1.
+2) E2 raster exporter (circular masked grayscale) + meta propagation.
+3) E3 parameters + generate/regenerate; preview/final switch (optional).
+4) E4 step viewer + PNG/CSV + project save (IndexedDB).
+5) Fine‑tuning & tests (determinism, fixtures, perf tuning).
+6) PWA polish + Capacitor setup; APK/AAB trial builds.
+
+SAMPLES DATASET (for development & QA)
+- Archive: samples_for_stringart_dev.zip
+- Structure: samples/ (10 grayscale 1024×1024 PNGs) + README.txt
+  01_portrait_silhouette.png  — silhouette (head/shoulders)
+  02_landscape_hills.png      — layered sine “hills”
+  03_logo_shapes.png          — geometric shapes
+  04_mandala_radial.png       — concentric rings + spokes (line‑cache stress)
+  05_text_string_art.png      — bold “STRING\nART”
+  06_noisy_gradient.png       — gradient + Gaussian noise
+  07_star_edges.png           — star polygon + chords
+  08_soft_blobs.png           — low‑contrast blobs
+  09_circle_ring.png          — solid disk + ring
+  10_checkerboard.png         — high‑frequency checkerboard
+- Suggested starting params (pins, strings, minDist, fade):
+  • Portrait/Logo/Text:      200, 2400, 18, 50
+  • Mandala/Star/Checker:    220, 2600, 16, 45
+  • Hills/Blobs/NoisyGrad:   180, 2200, 14, 55
+- Usage in this pipeline:
+  1) Import any sample at E1 → compose in E2 (circular) → confirm.
+  2) Generate in E3; iterate parameters; validate render/regenerate stability.
+  3) In E4, scrub steps to validate step‑by‑step drawing and CSV integrity.
+
+LLM‑ORIENTED NOTES
+- Keep the CORE ENGINE stateless across calls; pass all required inputs in each message (or maintain a small immutable session key).
+- Prefer JSON for params/meta; avoid UI‑specific assumptions inside the engine.
+- When chunking long runs, report progress via onProgress(stepCount, bestScore?). Avoid logging per‑step pixel data (too large).
+- Determinism: use a seeded RNG only for visual variation; the greedy selection must remain seed‑independent unless explicitly testing randomness.

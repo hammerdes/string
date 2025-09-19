@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+
+<html lang="tr">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width,initial-scale=1,viewport-fit=cover" name="viewport"/>
+<title>String Art (Mobil Uyumlu)</title>
+<!-- PWA / ikonlar -->
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" sizes="192x192" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<meta name="theme-color" content="#000000">
+
+<style>
+  :root{
+    --bg:#0f1115; --panel:#171a21; --muted:#9aa3b2; --text:#e8eef9; --accent:#5aa9ff;
+    --btn:#232837; --btn2:#2f3650; --good:#41c285; --warn:#ffb357; --danger:#ff6b6b;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; background:var(--bg); color:var(--text); font:14px/1.35 system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Apple Color Emoji","Segoe UI Emoji";
+  }
+  header{
+    position:sticky; top:0; z-index:5; backdrop-filter: blur(6px);
+    background: color-mix(in srgb, var(--bg) 80%, transparent);
+    border-bottom:1px solid #202536; padding:10px 14px;
+  }
+  header h1{margin:0; font-size:16px; letter-spacing:.3px}
+  main{display:grid; grid-template-columns:1fr 420px; gap:14px; padding:14px; max-width:1400px; margin:0 auto}
+  @media (max-width: 1100px){ main{grid-template-columns:1fr}}
+  .panel{
+    background:var(--panel); border:1px solid #202536; border-radius:12px; padding:12px;
+    box-shadow:0 6px 24px rgba(0,0,0,.25);
+  }
+  .canvas-wrap{display:flex; justify-content:center; align-items:center; min-height:60vh}
+  canvas{display:block; width:100%; height:auto; border-radius:12px; background:#000}
+  .controls{display:grid; gap:12px}
+  .row{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+  .row-3{display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px}
+  @media (max-width:780px){ .row,.row-3{grid-template-columns:1fr}}
+  label{display:block; font-size:12px; color:var(--muted); margin-bottom:6px}
+  input[type="range"]{width:100%}
+  input[type="number"],select,input[type="text"],input[type="color"]{
+    width:100%; padding:10px 12px; border-radius:8px; border:1px solid #2a3045; background:#0f1320; color:var(--text);
+    outline:none;
+  }
+  input[type="file"]{width:100%}
+  .btns{display:flex; flex-wrap:wrap; gap:8px; margin-top:4px}
+  button{
+    appearance:none; border:1px solid #2a3045; background:var(--btn); color:var(--text);
+    padding:10px 12px; border-radius:10px; cursor:pointer; font-weight:600; letter-spacing:.2px
+  }
+  button.primary{background:var(--btn2); border-color:#3a4262; color:#e9efff}
+  button.good{background:color-mix(in srgb, var(--good) 22%, var(--btn) 78%); border-color:#2e7d60}
+  button.warn{background:color-mix(in srgb, var(--warn) 25%, var(--btn) 75%); border-color:#7a5a23}
+  button.danger{background:color-mix(in srgb, var(--danger) 22%, var(--btn) 78%); border-color:#7a2a2a}
+  .meter{height:10px; border-radius:999px; background:#0d1220; border:1px solid #222841; overflow:hidden}
+  .meter>i{display:block; height:100%; width:0%; background:linear-gradient(90deg, #4f8cff, #41c285)}
+  .tiny{font-size:12px; color:var(--muted)}
+  .stack{display:flex; gap:8px; align-items:center}
+  .steps{height:240px; width:100%; border-radius:10px; background:#0f1320; color:#e9efff; border:1px solid #2a3045; padding:10px}
+  .hint{color:var(--muted); font-size:12px; margin:8px 0 0}
+  .chips{display:flex; gap:8px; flex-wrap:wrap}
+  .chip{padding:6px 8px; border-radius:999px; background:#0f1320; border:1px solid #2a3045; color:#b6c1da; font-size:12px}
+  .footer{opacity:.75; font-size:12px; padding:8px 12px}
+
+button, select, input[type="number"], textarea {
+    font-size: 18px !important;
+    padding: 14px 16px !important;
+}
+label {
+    font-size: 14px !important;
+}
+h2 {
+    font-size: 18px !important;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+h2 .arrow {
+    font-size: 16px;
+    transition: transform 0.3s;
+}
+.panel-section.collapsed > *:not(h2) {
+    display: none;
+}
+.panel-section.collapsed h2 .arrow {
+    transform: rotate(-90deg);
+}
+/* Modal styles */
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 999;
+}
+.modal-content {
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid #202536;
+  border-radius: 14px;
+  max-width: 900px;
+  width: 100%;
+  max-height: 85vh;
+  overflow: auto;
+  padding: 18px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.35);
+}
+.modal-content h3 { margin-top: 0; }
+.modal-content table { width:100%; border-collapse: collapse; margin: 8px 0 12px; }
+.modal-content table th, .modal-content table td { border: 1px solid #2a3045; padding: 8px; font-size: 14px; }
+.modal-content pre { background:#0f1320; border:1px solid #2a3045; padding:8px; border-radius:8px; overflow:auto; }
+.modal-content .guide-body { font-size: 14px; line-height: 1.5; }
+
+</style>
+</head>
+<body>
+<header><h1>String Art — mobil öncelikli, kütüphanesiz</h1></header>
+<main>
+<section class="panel">
+<div class="canvas-wrap">
+<canvas aria-label="String Art tuvali" height="1000" id="art" width="1000"></canvas>
+</div><div class="progress-container"><div aria-hidden="true" class="meter"><i id="bar" style="width:0%"></i></div><div class="tiny" id="status">Beklemede</div></div>
+<div aria-live="polite" class="chips" id="quickStats"></div>
+<div class="footer">İpucu: mobilde daha geniş tuval için telefonunu döndür.</div>
+</section>
+<aside class="panel controls" id="ctrls"><div class="panel-section"><button class="primary" id="helpBtn" style="font-size:12px;padding:6px 8px;">Yardım / Rehber</button><h2 style="cursor:default;">Temel Ayarlar</h2><div>
+<div class="btns">
+</div>
+<label for="file">Girdi resmi</label>
+<input accept="image/*" id="file" type="file"/>
+<div class="hint">Merkezden kırpma ve gri tonlama otomatik uygulanır.</div>
+</div><div class="row">
+<div>
+<label for="pins">Çiviler: <b id="pinsOut">200</b></label>
+<input id="pins" max="320" min="40" step="1" style="padding:10px;font-size:16px;width:100%;" type="number" value="200"/>
+</div>
+<div>
+<label for="strings">İplik sayısı: <b id="stringsOut">2200</b></label>
+<input id="strings" max="6000" min="100" step="20" style="padding:10px;font-size:16px;width:100%;" type="number" value="2200"/>
+</div>
+</div><div class="row">
+<div>
+<label for="color">Tel rengi</label>
+<select id="color"><option selected="selected" value="#000000">Siyah</option><option value="#ffffff">Beyaz</option><option value="#0000ff">Mavi</option><option value="#ff0000">Kırmızı</option><option value="#ffa500">Turuncu</option><option value="#8b4513">Kahverengi</option></select>
+</div>
+<div>
+<label for="board">Tahta rengi</label>
+<select id="board">
+<option value="black">Siyah</option>
+<option selected="selected" value="white">Beyaz</option>
+</select>
+</div>
+</div><div class="btns">
+<button id="recalc" title="Parametre değişikliklerinden sonra çivileri/hatları yeniden hesapla">Çivileri Yeniden Hesapla</button>
+<button class="primary" id="generate">Oluştur</button>
+<button id="step">Adım ×1</button>
+<button class="warn" disabled="" id="stop">Durdur</button>
+<button class="danger" id="clear">Temizle</button>
+<button class="good" id="save">PNG Dışa Aktar</button>
+</div></div><div class="panel-section"><h2>Gelişmiş Ayarlar<span class="arrow">▼</span></h2><div class="row-3">
+<div>
+<label for="minDist">Çiviler arası min mesafe: <b id="minDistOut">15</b></label>
+<input id="minDist" max="60" min="2" step="1" style="padding:10px;font-size:16px;width:100%;" type="number" value="15"/>
+</div>
+<div>
+<label for="fade">Tel solma (hedefi beyazlatır): <b id="fadeOut">50</b></label>
+<input id="fade" max="100" min="1" step="1" style="padding:10px;font-size:16px;width:100%;" type="number" value="50"/>
+</div>
+<div>
+<label for="alpha">Tel opaklığı: <b id="alphaOut">80</b></label>
+<input id="alpha" max="255" min="5" step="1" style="padding:10px;font-size:16px;width:100%;" type="number" value="80"/>
+</div>
+</div><div class="row-3">
+<div>
+<label for="widthPx">Tel kalınlığı (px): <b id="widthPxOut">0.9</b></label>
+<input id="widthPx" max="2.4" min="0.4" step="0.1" style="padding:10px;font-size:16px;width:100%;" type="number" value="0.9"/>
+</div>
+<div>
+<label for="var">Rastgele bükülme: <b id="varOut">3</b></label>
+<input id="var" max="10" min="0" step="1" style="padding:10px;font-size:16px;width:100%;" type="number" value="3"/>
+</div>
+<div>
+<label for="pinSize">Çivi boyutu (px): <b id="pinSizeOut">5</b></label>
+<input id="pinSize" max="10" min="2" step="1" style="padding:10px;font-size:16px;width:100%;" type="number" value="5"/>
+</div>
+</div><div>
+</div><div>
+<label for="stepsBox">Adımlar (sonraki çivi indekslerinin CSV'si)</label>
+<textarea class="steps" id="stepsBox" readonly=""></textarea>
+<div class="btns">
+<button id="copySteps">Kopyala</button>
+<button id="downloadSteps">CSV İndir</button>
+</div>
+<p class="hint">0 numaralı çividen başlayın (üstte, saat yönünde). Her sayı <em>sonraki</em> sarılacak çiviyi gösterir.</p>
+</div></div></aside>
+</main>
+<script>
+/** -----------------------------------------------------------
+ *  String Art generator — pure Canvas, mobile friendly
+ *  Core ideas mirror the workflow in your shared kniter.js:
+ *  - Circle pin layout
+ *  - Bresenham line rasterization
+ *  - Score = sum(255 - residual) along a candidate line
+ *  - After drawing a string, lighten residual by "fade"
+ *  - Skip recently used pairs and pins closer than minDist
+ * ----------------------------------------------------------*/
+
+(function(){
+  const $ = (sel)=>document.querySelector(sel);
+
+  // Canvas & contexts
+  const canvas = $('#art');
+  const ctx = canvas.getContext('2d', {alpha: true});
+  // Offscreen canvases for image prep and residual work buffer
+  const srcCanvas = document.createElement('canvas');  // grayscale source
+  const srcCtx    = srcCanvas.getContext('2d', {willReadFrequently:true});
+
+  // UI elements
+  const ui = {
+    file: $('#file'), pins: $('#pins'), strings: $('#strings'), minDist: $('#minDist'),
+    fade: $('#fade'), alpha: $('#alpha'), widthPx: $('#widthPx'), var: $('#var'), pinSize: $('#pinSize'),
+    color: $('#color'), board: $('#board'),
+    pinsOut: $('#pinsOut'), stringsOut: $('#stringsOut'), minDistOut: $('#minDistOut'),
+    fadeOut: $('#fadeOut'), alphaOut: $('#alphaOut'), widthPxOut: $('#widthPxOut'), varOut: $('#varOut'), pinSizeOut: $('#pinSizeOut'),
+    recalc: $('#recalc'), generate: $('#generate'), step: $('#step'), stop: $('#stop'), clear: $('#clear'), save: $('#save'),
+    bar: $('#bar'), status: $('#status'), stepsBox: $('#stepsBox'), copySteps: $('#copySteps'), downloadSteps: $('#downloadSteps'),
+    quickStats: $('#quickStats'),
+  };
+
+  // Parameters (defaults tuned to your snippet)
+  let SIZE = 700;          // logical size for scoring/grid
+  let NR_PINS = 200;
+  let LAST_NR_PINS = -1;
+  let stringsNumber = 2200;
+  let minDist = 15;
+  let lineFade = 50;
+  let lineAlpha = 80;
+  let lineWidth = 0.9;
+  let lineVariation = 3;
+  let pinSize = 5;
+  let stringColor = '#000000';
+  let boardColor = 'white';
+
+  // State / buffers
+  let pins = [];                             // [ {x,y}, ... ]
+  const linesCache = new Map();              // "i-j" -> Int32Array([x0,y0,x1,y1,...])
+  let residual = null;                       // Float32Array (SIZE*SIZE), grayscale mutable
+  let imgLoaded = false;
+  let usedPairs = new Set();                 // Set of "small-big" keys
+  let steps = [];                            // list of visited pins (0-indexed)
+  let stepsCSV = '';                         // "next,next,next..."
+  let current = 0;                           // current pin index
+  let generating = false;
+  let reqId = null;
+
+  // Resize canvas for devicePixelRatio & container width
+  function fitCanvas(){
+    const wrap = canvas.parentElement;
+    const cssSize = Math.min(wrap.clientWidth, 1000);
+    const dpr = Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
+    canvas.style.width = cssSize + 'px';
+    canvas.style.height = cssSize + 'px';
+    canvas.width  = Math.floor(cssSize*dpr);
+    canvas.height = Math.floor(cssSize*dpr);
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    // Logical SIZE for scoring/grid is separate; keep it near 700 for quality
+    SIZE = Math.min( Math.max(480, Math.round(cssSize)), 900 );
+  }
+  window.addEventListener('resize', ()=>{ fitCanvas(); drawAll(); });
+  fitCanvas();
+
+  // UI wiring
+  function bindRange(range, out, assign){
+    const update = ()=>{ out.textContent = range.value; assign(+range.value); if(!generating) drawAll(); };
+    range.addEventListener('input', update); update();
+  }
+  bindRange(ui.pins, ui.pinsOut, v=>NR_PINS=v|0);
+  bindRange(ui.strings, ui.stringsOut, v=>stringsNumber=v|0);
+  bindRange(ui.minDist, ui.minDistOut, v=>minDist=v|0);
+  bindRange(ui.fade, ui.fadeOut, v=>lineFade=v|0);
+  bindRange(ui.alpha, ui.alphaOut, v=>lineAlpha=v|0);
+  bindRange(ui.widthPx, ui.widthPxOut, v=>lineWidth=+v);
+  bindRange(ui.var, ui.varOut, v=>lineVariation=v|0);
+  bindRange(ui.pinSize, ui.pinSizeOut, v=>pinSize=v|0);
+  ui.color.addEventListener('input', ()=>{ stringColor = ui.color.value; drawAll();});
+  ui.board.addEventListener('change', ()=>{ boardColor = ui.board.value; drawAll(); });
+
+  ui.recalc.addEventListener('click', ()=>{ precompute(true); drawAll(); });
+  ui.generate.addEventListener('click', ()=> startGenerate());
+  ui.step.addEventListener('click', ()=> stepOnce());
+  ui.clear.addEventListener('click', ()=> resetAll());
+  ui.stop.addEventListener('click', stopGenerate);
+  ui.save.addEventListener('click', savePNG);
+  ui.copySteps.addEventListener('click', copySteps);
+  ui.downloadSteps.addEventListener('click', downloadCSV);
+
+  ui.file.addEventListener('change', onFile);
+
+  function setStatus(s){ ui.status.textContent = s; }
+  function progress(p){ ui.bar.style.width = (100*p).toFixed(1)+'%'; }
+
+  // Utility
+  const clamp=(v,lo,hi)=>v<lo?lo:(v>hi?hi:v);
+  function keyPair(a,b){ return a<b ? (a+'-'+b) : (b+'-'+a); }
+  function mod(a,n){ a%=n; return a<0?a+n:a; }
+
+  // Deterministic tiny RNG for bend control points
+  function rand(seed){
+    // xorshift32
+    let x = (seed|0) + 0x9e3779b9;
+    x ^= x << 13; x ^= x >>> 17; x ^= x << 5;
+    return (x>>>0) / 4294967296;
+  }
+
+  // Load user image -> build grayscale source & residual buffer
+  function onFile(e){
+    const f = e.target.files && e.target.files[0];
+    if(!f) return;
+    const img = new Image();
+    img.onload = ()=>{
+      // Square center-crop and draw grayscale into srcCanvas (SIZE x SIZE)
+      const s = SIZE;
+      srcCanvas.width = s; srcCanvas.height = s;
+      // Compute cover crop box
+      const r = Math.min(img.width, img.height);
+      const sx = Math.floor((img.width  - r)/2);
+      const sy = Math.floor((img.height - r)/2);
+      srcCtx.clearRect(0,0,s,s);
+      srcCtx.drawImage(img, sx,sy,r,r, 0,0,s,s);
+
+      // Grayscale and slight contrast boost
+      const im = srcCtx.getImageData(0,0,s,s);
+      const px = im.data;
+      for(let i=0;i<px.length;i+=4){
+        const r = px[i], g = px[i+1], b = px[i+2];
+        let y = 0.2126*r + 0.7152*g + 0.0722*b; // luminance
+        // optional gamma
+        y = Math.pow(y/255, 1.0/1.05)*255;
+        px[i]=px[i+1]=px[i+2]=y;
+        px[i+3]=255;
+      }
+      srcCtx.putImageData(im,0,0);
+
+      // Residual buffer starts as grayscale
+      residual = new Float32Array(s*s);
+      const px2 = srcCtx.getImageData(0,0,s,s).data;
+      for(let i=0, j=0;i<px2.length;i+=4, j++){
+        residual[j] = px2[i]; // 0..255
+      }
+      imgLoaded = true;
+      precompute(true);
+      resetDrawing();
+      drawAll();
+      setStatus('Resim yüklendi. Hazır.');
+    };
+    img.onerror = ()=> setStatus('Resim yüklenemedi.');
+    img.src = URL.createObjectURL(f);
+  }
+
+  // (Re)compute pins & (optionally) the lines cache
+  function precompute(force=false){
+    // Recompute pins on a circle
+    pins = [];
+    const cx = SIZE/2, cy = SIZE/2, R = (SIZE/2)-6;
+    const step = Math.PI*2/NR_PINS;
+    for(let i=0;i<NR_PINS;i++){
+      const ang = i*step;
+      pins.push({x:Math.round(cx + R*Math.cos(ang)), y:Math.round(cy + R*Math.sin(ang))});
+    }
+    // Invalidate cache if pin count changed
+    if(force || LAST_NR_PINS!==NR_PINS){
+      linesCache.clear();
+      LAST_NR_PINS = NR_PINS;
+    }
+    // Update quick stats
+    ui.quickStats.innerHTML = `
+      <span class="chip">${NR_PINS} çivi</span>
+      <span class="chip">${stringsNumber} ip</span>
+      <span class="chip">min mesafe ${minDist}</span>
+      <span class="chip">solma ${lineFade}</span>
+    `;
+  }
+
+  // Get or compute Bresenham pixel points for a pair
+  function getLinePixels(ai, bi){
+    const k = keyPair(ai, bi);
+    const cached = linesCache.get(k);
+    if(cached) return cached;
+    const a = pins[ai], b = pins[bi];
+    let x0=a.x, y0=a.y, x1=b.x, y1=b.y;
+    const dx = Math.abs(x1-x0), dy = Math.abs(y1-y0);
+    const sx = x0<x1 ? 1 : -1;
+    const sy = y0<y1 ? 1 : -1;
+    let err = dx - dy;
+    const out = [];
+    while(true){
+      out.push(x0, y0);
+      if (x0===x1 && y0===y1) break;
+      const e2 = err<<1;
+      if (e2 > -dy){ err -= dy; x0 += sx; }
+      if (e2 <  dx){ err += dx; y0 += sy; }
+    }
+    const arr = Int32Array.from(out);
+    linesCache.set(k, arr);
+    return arr;
+  }
+
+  // Score a candidate line: higher if it crosses darker pixels
+  function lineScore(ai, bi){
+    const pts = getLinePixels(ai, bi);
+    const w = SIZE;
+    let s = 0;
+    for(let i=0;i<pts.length;i+=2){
+      const x = pts[i], y = pts[i+1];
+      const xi = clamp(x,0,w-1), yi = clamp(y,0,w-1);
+      const idx = yi*w + xi;
+      s += (255 - residual[idx]);
+    }
+    return s / (pts.length/2);
+  }
+
+  // After drawing a string, lighten the residual along the path
+  function reduceLine(ai, bi){
+    const pts = getLinePixels(ai, bi);
+    const w = SIZE;
+    for(let i=0;i<pts.length;i+=2){
+      const x = pts[i], y = pts[i+1];
+      const xi = clamp(x,0,w-1), yi = clamp(y,0,w-1);
+      const idx = yi*w + xi;
+      residual[idx] = Math.min(255, residual[idx] + lineFade);
+    }
+  }
+
+  // Choose the next pin
+  function nextPin(curr){
+    let best=-1, bestScore=0;
+    for(let i=0;i<NR_PINS;i++){
+      if(i===curr) continue;
+      // wrap-around distance on ring
+      const d = Math.abs(i-curr);
+      const minWrap = Math.min(d, NR_PINS-d);
+      if(minWrap < minDist) continue;
+      const k = keyPair(curr,i);
+      if(usedPairs.has(k)) continue;
+      const s = lineScore(curr,i);
+      if(s > bestScore){ bestScore = s; best = i; }
+    }
+    return best;
+  }
+
+  // Draw helpers -------------------------------------------------------------
+  function clearCanvas(){
+    // Board / frame
+    ctx.save();
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    const s = canvas.clientWidth;
+    const cx = s/2, cy = s/2;
+    const rOuter = (s/2) - 8;
+    ctx.fillStyle = boardColor==='black' ? '#000' : '#fff';
+    ctx.beginPath(); ctx.arc(cx,cy, rOuter, 0, Math.PI*2); ctx.fill();
+
+    // Lippy frame ring for a nicer look
+    ctx.lineWidth = 10;
+    ctx.strokeStyle = boardColor==='black' ? '#cfd6e6' : '#222';
+    ctx.beginPath(); ctx.arc(cx,cy, rOuter-1, 0, Math.PI*2); ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawPins(){
+    const s = canvas.clientWidth;
+    const scale = s / SIZE;
+    ctx.save();
+    ctx.fillStyle = '#e9e9e9';
+    for(const p of pins){
+      ctx.beginPath();
+      ctx.arc(p.x*scale, p.y*scale, pinSize*scale, 0, Math.PI*2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function drawStringsFromSteps(){
+    const s = canvas.clientWidth, scale=s/SIZE;
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    const a = hexToRGBA(stringColor, lineAlpha/255);
+    ctx.strokeStyle = a;
+    ctx.lineWidth = lineWidth * scale;
+    for(let i=0;i<steps.length-1;i++){
+      drawOneCurve(steps[i], steps[i+1], i, scale);
+    }
+    ctx.restore();
+  }
+
+  function drawOneCurve(ai, bi, idx, scale){
+    // Quadratic-ish with deterministic bend near mid
+    const a = pins[ai], b = pins[bi];
+    const ax = a.x*scale, ay = a.y*scale;
+    const bx = b.x*scale, by = b.y*scale;
+    if(lineVariation<=0){
+      ctx.beginPath();
+      ctx.moveTo(ax,ay); ctx.lineTo(bx,by); ctx.stroke();
+      return;
+    }
+    const midx = (ax+bx)/2, midy=(ay+by)/2;
+    const seed = (ai*73856093) ^ (bi*19349663) ^ (idx*83492791);
+    const jitter = lineVariation * scale;
+    const jx = (rand(seed)-0.5)*2*jitter;
+    const jy = (rand(seed+1)-0.5)*2*jitter;
+
+    ctx.beginPath();
+    ctx.moveTo(ax,ay);
+    // use cubic with same control points to mimic p5's approach in kniter.js
+    ctx.bezierCurveTo(midx+jx, midy+jy, midx+jx, midy+jy, bx,by);
+    ctx.stroke();
+  }
+
+  function drawAll(){
+    clearCanvas();
+    if(pins.length) drawPins();
+    if(steps.length>1) drawStringsFromSteps();
+  }
+
+  function hexToRGBA(hex, a){
+    // #rrggbb
+    const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+    if(!m) return `rgba(255,255,255,${a})`;
+    const i = parseInt(m[1],16);
+    const r = (i>>16)&255, g=(i>>8)&255, b=i&255;
+    return `rgba(${r},${g},${b},${a})`;
+  }
+
+  // Workflow controls --------------------------------------------------------
+  function resetDrawing(){
+    usedPairs.clear();
+    steps = [];
+    stepsCSV = '';
+    current = 0;
+    if(NR_PINS>0) steps.push(current);
+    progress(0);
+    setStatus('Hazır.');
+    ui.stepsBox.value = '';
+    drawAll();
+  }
+
+  function resetAll(){
+    if(imgLoaded){
+      // rebuild residual from srcCanvas pixels
+      const px = srcCtx.getImageData(0,0,SIZE,SIZE).data;
+      residual = new Float32Array(SIZE*SIZE);
+      for(let i=0,j=0;i<px.length;i+=4,j++) residual[j] = px[i];
+    }
+    precompute(true);
+    resetDrawing();
+  }
+
+  async function startGenerate(){
+    if(!imgLoaded){ setStatus('Önce bir resim yükleyin'); return; }
+    if(generating) return;
+    precompute(); // ensure pins exist
+    generating = true;
+    ui.generate.disabled = true;
+    ui.step.disabled = true;
+    ui.stop.disabled = false;
+    setStatus('Oluşturuluyor…');
+    runGeneratorLoop();
+  }
+
+  function stopGenerate(){
+    generating = false;
+    ui.generate.disabled = false;
+    ui.step.disabled = false;
+    ui.stop.disabled = true;
+    setStatus('Durduruldu.');
+    if(reqId!==null){ cancelAnimationFrame(reqId); reqId=null; }
+  }
+
+  // Do N steps at a time to keep UI responsive
+  function runGeneratorLoop(){
+    const batch = 20;
+    let done = 0;
+    const tick = ()=>{
+      if(!generating) return;
+      for(let k=0;k<batch;k++){
+        if(steps.length>=stringsNumber) { stopGenerate(); setStatus('Tamamlandı.'); break; }
+        const next = nextPin(current);
+        if(next<0){ stopGenerate(); setStatus('Geçerli çizgi kalmadı (kısıtlara takıldı).'); break; }
+        commitStep(next);
+        done++;
+      }
+      drawAll();
+      progress(steps.length/stringsNumber);
+      if(generating) reqId = requestAnimationFrame(tick);
+    };
+    reqId = requestAnimationFrame(tick);
+  }
+
+  function stepOnce(){
+    if(!imgLoaded){ setStatus('Önce bir resim yükleyin'); return; }
+    precompute();
+    const next = nextPin(current);
+    if(next<0){ setStatus('Geçerli çizgi kalmadı.'); return; }
+    commitStep(next);
+    drawAll();
+    progress(steps.length/stringsNumber);
+  }
+
+  function commitStep(next){
+    // draw curve (visual) and update residual (model)
+    usedPairs.add( keyPair(current, next) );
+    reduceLine(current, next);
+    steps.push(next);
+    // build CSV (just like kniter.js builds "stepsInstructions")
+    stepsCSV += (stepsCSV ? ',' : '') + next;
+    ui.stepsBox.value = stepsCSV;
+    current = next;
+    setStatus(`Adım ${steps.length-1}/${stringsNumber}`);
+  }
+
+  // Export helpers -----------------------------------------------------------
+  function savePNG(){
+    const a = document.createElement('a');
+    a.href = canvas.toDataURL('image/png');
+    a.download = `string-art_${NR_PINS}pins_${steps.length-1}strings.png`;
+    a.click();
+  }
+
+  async function copySteps(){
+    try{
+      await navigator.clipboard.writeText(stepsCSV);
+      setStatus('Adımlar panoya kopyalandı.');
+    }catch(e){
+      setStatus('Kopyalama başarısız. Manuel olarak seçip kopyalayabilirsiniz.');
+    }
+  }
+
+  function downloadCSV(){
+    const blob = new Blob([stepsCSV+'\n'], {type:'text/csv'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `string-art-steps_${NR_PINS}pins_${steps.length-1}strings.csv`;
+    a.click(); URL.revokeObjectURL(url);
+  }
+
+  // Initial blank setup
+  precompute(true);
+  resetDrawing();
+  
+    stringColor = ui.color.value || '#000000';
+    boardColor = ui.board.value || 'white';
+    drawAll();
+    
+})();
+
+// Collapsible advanced settings
+document.addEventListener("DOMContentLoaded", function(){
+    document.querySelectorAll('.panel-section h2').forEach(function(h2){
+        h2.addEventListener('click', function(){
+            const section = h2.parentElement;
+            section.classList.toggle('collapsed');
+        });
+    });
+});
+// Yardım modal aç/kapat
+document.addEventListener('DOMContentLoaded', function(){
+  var helpBtn = document.getElementById('helpBtn');
+  var helpModal = document.getElementById('helpModal');
+  var helpClose = document.getElementById('helpClose');
+  function openHelp(){ helpModal.style.display = 'flex'; }
+  function closeHelp(){ helpModal.style.display = 'none'; }
+  if(helpBtn){ helpBtn.addEventListener('click', openHelp); }
+  if(helpClose){ helpClose.addEventListener('click', closeHelp); }
+  if(helpModal){ helpModal.addEventListener('click', function(e){ if(e.target===helpModal) closeHelp(); }); }
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeHelp(); });
+});
+
+</script>
+<div aria-labelledby="helpTitle" aria-modal="true" class="modal" id="helpModal" role="dialog" style="display:none;">
+<div class="modal-content">
+<h3 id="helpTitle">Yüksek Kaliteli Baskı Ayarları Rehberi</h3>
+<div class="guide-body">
+<p>Bu rehber, yüksek kaliteli string art baskıları için pratik ayar önerileri sunar.</p>
+<h4>1) Hedefleri Belirle</h4>
+<ul>
+<li><b>Boyut:</b> Pano çapı/ölçüsü</li>
+<li><b>Detay:</b> Portre (daha fazla çivi/ip) vs Logo (daha az çivi yeter)</li>
+<li><b>Kontrast:</b> Tel–tahta zıtlığı yüksek olmalı</li>
+</ul>
+<h4>2) Çivi Sayısı</h4>
+<table>
+<tr><th>Aralık</th><th>Avantaj</th><th>Dezavantaj</th></tr>
+<tr><td>100–150</td><td>Hızlı, sade</td><td>Detay sınırlı</td></tr>
+<tr><td>180–240</td><td>Dengeli</td><td>Çok ince detaylar eksik kalabilir</td></tr>
+<tr><td>250–300</td><td>Maksimum detay</td><td>Daha yavaş, daha çok ip ister</td></tr>
+</table>
+<h4>3) İp Sayısı</h4>
+<ul>
+<li>200 çivi → ~2500–4000 ip</li>
+<li>250 çivi → ~3500–5000 ip</li>
+<li>300 çivi → ~4500–6000 ip</li>
+</ul>
+<h4>4) Tel Solma &amp; Min Mesafe</h4>
+<ul>
+<li><b>Min Mesafe:</b> 12–20 tipik; daha yüksek → daha fazla çapraz</li>
+<li><b>Tel Solma:</b> 40–60 dengeli; 20–35 koyu bölgeleri vurgular; 70+ homojenleştirir</li>
+</ul>
+<h4>5) Test &amp; Çıktı</h4>
+<ol>
+<li>Küçük çözünürlükte dene, parametreleri bul</li>
+<li>Yüksek çözünürlükte final üret</li>
+<li>PNG’yi tam boyutta kontrol et</li>
+</ol>
+<h4>Özet Hızlı Ayarlar</h4>
+<table>
+<tr><th>Kullanım</th><th>Pin</th><th>İp</th><th>Min Mesafe</th><th>Tel Solma</th><th>DPI (Kalite)</th><th>Renk</th></tr>
+<tr><td>Küçük pano, logo</td><td>150</td><td>2000</td><td>15</td><td>50</td><td>150</td><td>Siyah–Beyaz</td></tr>
+<tr><td>Orta pano, portre</td><td>220</td><td>3500</td><td>15</td><td>45</td><td>200</td><td>Siyah–Beyaz</td></tr>
+<tr><td>Büyük pano, detay</td><td>280</td><td>5000+</td><td>15</td><td>50</td><td>300</td><td>Siyah–Beyaz</td></tr>
+</table>
+</div>
+<button aria-label="Kapat" class="danger" id="helpClose">Kapat</button>
+</div>
+</div>
+</body>
+</html>
