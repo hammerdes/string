@@ -119,6 +119,15 @@ function bindGenerate(){
         renderPinsAndStrings(rc, data.size, data.pins, data.steps, p.params);
         document.getElementById('e4-step').max=data.steps.length-1;
         document.getElementById('e4-count').textContent=(data.steps.length-1)+' steps';
+      } else if(type==='status'){
+        if(data.state==='paused'){
+          stat.textContent='Paused';
+        } else if(data.state==='running'){
+          stat.textContent='Running';
+        } else if(data.state==='canceled'){
+          bar.style.width='0%';
+          stat.textContent='Canceled';
+        }
       }
     };
     return worker;
