@@ -100,6 +100,13 @@ function bindGenerate(){
   const rc=document.getElementById('render-canvas');
 
   let worker=null;
+  const previewState = { pins:null, size:null, lastCount:0, renderedStep:0 };
+  function resetPreviewState(){
+    previewState.pins=null;
+    previewState.size=null;
+    previewState.lastCount=0;
+    previewState.renderedStep=0;
+  }
   function ensureWorker(){
     if(worker) return worker;
     worker = new Worker('./js/workers/compute.worker.js', {type:'module'});
@@ -109,14 +116,28 @@ function bindGenerate(){
         bar.style.width=(100*data.progress).toFixed(1)+'%';
         stat.textContent='Step ' + data.step + '/' + data.max;
         const p=State.get().project;
-        if(data.steps && data.steps.length>1){
-          renderPinsAndStrings(rc, data.size||p.size, data.pins||buildPins(p.size||data.size, p.params.pins), data.steps, p.params);
+        if(typeof data.step==='number' && data.step <= previewState.renderedStep){ resetPreviewState(); }
+        if(typeof data.step==='number' && data.step > previewState.renderedStep){ previewState.renderedStep = data.step; }
+        if(data.pins) previewState.pins = data.pins;
+        if(data.size) previewState.size = data.size;
+        if(p && data.steps && data.steps.length>1 && data.steps.length>previewState.lastCount){
+          const size = previewState.size || p.size;
+          let pins = previewState.pins;
+          if(!pins && size){ pins = buildPins(size, p.params.pins); if(pins) previewState.pins = pins; }
+          if(size && pins){
+            renderPinsAndStrings(rc, size, pins, data.steps, p.params);
+            previewState.lastCount = data.steps.length;
+          }
         }
       } else if(type==='result'){
         const p=State.get().project;
         p.stepsCSV=data.steps.join(','); p.stepCount=data.steps.length; p.updatedAt=Date.now(); State.persistMeta();
         bar.style.width='100%'; stat.textContent='Done in ' + data.durationMs + ' ms';
         renderPinsAndStrings(rc, data.size, data.pins, data.steps, p.params);
+        previewState.pins = data.pins;
+        previewState.size = data.size;
+        previewState.lastCount = data.steps.length;
+        previewState.renderedStep = data.steps.length-1;
         document.getElementById('e4-step').max=data.steps.length-1;
         document.getElementById('e4-count').textContent=(data.steps.length-1)+' steps';
       } else if(type==='status'){
@@ -135,6 +156,7 @@ function bindGenerate(){
 
   btnStart.addEventListener('click', async ()=>{
     const p=State.get().project;
+    resetPreviewState();
     p.params.pins=+document.getElementById('p-pins').value;
     p.params.strings=+document.getElementById('p-steps').value;
     p.params.minDist=+document.getElementById('p-mindist').value;

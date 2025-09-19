@@ -114,7 +114,10 @@ export async function runGreedyLoop(imageData, pins, options, onProgress){
     const st = engine.step(); if(!st) break;
     steps.push(st);
     const p = (k+1)/maxSteps;
-    if(onProgress && p - lastProgress >= (options.progressThrottle||0.02)){ lastProgress = p; onProgress(k+1, st.score, engine.steps.slice()); }
+    if(onProgress && p - lastProgress >= (options.progressThrottle||0.02)){
+      lastProgress = p;
+      onProgress(k+1, st.score, engine.steps.slice(), engine.pins);
+    }
   }
   const t1 = performance.now();
   return { steps, residual: engine.residualSum(), durationMs: Math.round(t1-t0), pins: engine.pins, size: engine.size };
