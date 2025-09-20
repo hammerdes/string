@@ -107,7 +107,7 @@ export async function runGreedyLoop(imageData, pins, options, onProgress){
   const engine = new EngineCore({ size: options.size, fade: options.fade, minDist: options.minDist, pins, raster: imageData });
   const maxSteps = options.maxSteps|0;
   const steps = []; let lastProgress = 0;
-  const yieldStride = options.yieldStride|0;
+  const yieldStride = Math.max(1, options.yieldStride|0);
   for(let k=0;k<maxSteps;k++){
     if(options.shouldCancel && options.shouldCancel()) break;
     if(options.waitWhilePaused) await options.waitWhilePaused();

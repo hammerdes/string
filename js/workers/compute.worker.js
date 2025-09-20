@@ -4,7 +4,7 @@ import { runGreedyLoop } from '../engine.js';
 let paused = false, canceled = false;
 const pauseResolvers = [];
 const yieldToQueue = () => new Promise((resolve) => setTimeout(resolve, 0));
-const YIELD_STRIDE = 512;
+const MAX_YIELD_STRIDE = 512;
 
 const flushResolvers = () => {
   while (pauseResolvers.length) {
@@ -39,8 +39,12 @@ self.onmessage = async (e) => {
       waitWhilePaused,
       shouldCancel: () => canceled,
       yieldToQueue,
-      yieldStride: YIELD_STRIDE,
     };
+
+    opts.yieldStride = Math.min(
+      MAX_YIELD_STRIDE,
+      Math.max(1, Math.floor(opts.maxSteps / 32))
+    );
 
     // Önizleme gönderim aralığı (adım sayısına ve throttle'a göre)
     const previewStepStride = Math.max(
