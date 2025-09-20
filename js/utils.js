@@ -1,4 +1,6 @@
-export const DPR = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
+const devicePixelRatio = (typeof window !== 'undefined' && window.devicePixelRatio) ? window.devicePixelRatio : 1;
+export const DPR = Math.min(2, Math.max(1, devicePixelRatio));
+export const BOARD_MARGIN = 16;
 export function setCanvasSize(canvas, cssSize){
   const dpr = DPR;
   canvas.style.width = cssSize + 'px';

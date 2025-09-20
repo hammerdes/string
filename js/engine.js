@@ -1,5 +1,6 @@
+import { BOARD_MARGIN } from './utils.js';
+
 export function initEngine(config){ return new EngineCore(config); }
-const BOARD_MARGIN = 16;
 export class EngineCore{
   constructor(cfg){
     this.size = cfg.size|0;
