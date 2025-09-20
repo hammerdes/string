@@ -12,6 +12,7 @@ body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 system-ui,Seg
 @media(max-width:720px){.row{grid-template-columns:1fr}}
 .btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
 button{appearance:none;border:1px solid var(--ring);background:#0f1320;color:var(--text);padding:10px 12px;border-radius:10px;cursor:pointer;font-weight:600}
+#gen-pause,#gen-resume{display:none}
 button.primary{background:color-mix(in srgb, var(--brand) 22%, #0f1320 78%);border-color:#1e78a8}
 button.danger{background:color-mix(in srgb, #ef4444 22%, #0f1320 78%);border-color:#7a2a2a}
 button.good{background:color-mix(in srgb, #22c55e 22%, #0f1320 78%);border-color:#2e7d60}
