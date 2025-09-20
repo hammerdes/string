@@ -4,7 +4,7 @@ import { renderPinsAndStrings, exportSVG, exportCSV } from './renderer.js';
 
 const BOARD_MARGIN = 16;
 
-let crop = { img:null, scale:1, tx:0, ty:0, rot:0, down:false, lx:0, ly:0 };
+let crop = { img:null, scale:1, tx:0, ty:0, rot:0, down:false, lx:0, ly:0, displaySize:0 };
 
 export function mount(){
   document.querySelectorAll('header nav [data-nav]').forEach(b=>{ b.addEventListener('click', ()=>State.go(+b.dataset.nav)); });
@@ -115,7 +115,11 @@ function bindCrop(){
 
     octx.fillStyle = '#fff'; octx.fillRect(0,0,SIZE,SIZE);
     octx.save();
-    octx.translate(SIZE/2 + crop.tx, SIZE/2 + crop.ty);
+    const previewSize = crop.displaySize || document.getElementById('crop-canvas')?.clientWidth || SIZE;
+    const ratio = (Number.isFinite(previewSize) && previewSize>0) ? (SIZE / previewSize) : 1;
+    const exportTx = crop.tx * ratio;
+    const exportTy = crop.ty * ratio;
+    octx.translate(SIZE/2 + exportTx, SIZE/2 + exportTy);
     octx.beginPath(); octx.arc(0,0,(SIZE/2)-BOARD_MARGIN,0,Math.PI*2); octx.clip();
     octx.rotate(crop.rot||0);
 
@@ -138,7 +142,7 @@ function bindCrop(){
     const blob = new Blob([gray], {type:'application/octet-stream'});
     const proj = State.get().project;
     proj.size=SIZE; proj.circle={cx:SIZE/2, cy:SIZE/2, r:(SIZE/2)-BOARD_MARGIN};
-    proj.view={scale:crop.scale, tx:crop.tx, ty:crop.ty, rot:crop.rot};
+    proj.view={scale:crop.scale, tx:exportTx, ty:exportTy, rot:crop.rot};
     proj.rasterBlobId = proj.id + '.raster'; proj.updatedAt = Date.now();
     await State.saveRasterBlob(proj.rasterBlobId, blob); State.persistMeta(); State.go(3);
   });
@@ -146,14 +150,36 @@ function bindCrop(){
 
 function drawCrop(){
   const cvs = document.getElementById('crop-canvas'); const ctx = cvs.getContext('2d');
-  const W=cvs.width, H=cvs.height;
-  ctx.clearRect(0,0,W,H);
-  ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(W/2,H/2,Math.min(W,H)/2-BOARD_MARGIN,0,Math.PI*2); ctx.fill();
+  const dpr = window.devicePixelRatio || 1;
+  const displayW = cvs.clientWidth || (cvs.width / dpr);
+  const displayH = cvs.clientHeight || (cvs.height / dpr);
+  const rawMin = Math.min(displayW, displayH);
+  const previewMinSide = rawMin || (Math.min(cvs.width, cvs.height) / dpr) || rawMin || 1;
+  const cx = displayW / 2;
+  const cy = displayH / 2;
+  const radius = Math.max(0, previewMinSide / 2 - BOARD_MARGIN);
+  crop.displaySize = previewMinSide;
+
+  ctx.save();
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.clearRect(0,0,cvs.width,cvs.height);
+  ctx.restore();
+
+  ctx.fillStyle='#fff';
+  ctx.beginPath();
+  ctx.arc(cx,cy,radius,0,Math.PI*2);
+  ctx.fill();
   if(!crop.img) return;
 
-  ctx.save(); ctx.beginPath(); ctx.arc(W/2,H/2,Math.min(W,H)/2-BOARD_MARGIN,0,Math.PI*2); ctx.clip();
-  ctx.translate(W/2 + crop.tx, H/2 + crop.ty); ctx.rotate(crop.rot||0);
-  const sw=crop.img.width, sh=crop.img.height; const minSide=Math.min(sw,sh); const scale=crop.scale*(Math.min(W,H)/minSide);
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx,cy,radius,0,Math.PI*2);
+  ctx.clip();
+  ctx.translate(cx + crop.tx, cy + crop.ty);
+  ctx.rotate(crop.rot||0);
+  const sw=crop.img.width, sh=crop.img.height;
+  const minSide=Math.min(sw,sh);
+  const scale=crop.scale*(previewMinSide/minSide);
   ctx.drawImage(crop.img, -sw*scale/2, -sh*scale/2, sw*scale, sh*scale);
   ctx.restore();
 }
