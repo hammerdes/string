@@ -1,8 +1,6 @@
 import * as State from './state.js';
-import { setCanvasSize } from './utils.js';
+import { setCanvasSize, BOARD_MARGIN } from './utils.js';
 import { renderPinsAndStrings, exportSVG, exportCSV } from './renderer.js';
-
-const BOARD_MARGIN = 16;
 
 let crop = { img:null, scale:1, tx:0, ty:0, rot:0, down:false, lx:0, ly:0, displaySize:0 };
 
@@ -165,23 +163,50 @@ function drawCrop(){
   ctx.clearRect(0,0,cvs.width,cvs.height);
   ctx.restore();
 
-  ctx.fillStyle='#fff';
+  if(crop.img){
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cx,cy,radius,0,Math.PI*2);
+    ctx.clip();
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(cx-radius, cy-radius, radius*2, radius*2);
+    ctx.translate(cx + crop.tx, cy + crop.ty);
+    ctx.rotate(crop.rot||0);
+    const sw=crop.img.width, sh=crop.img.height;
+    const minSide=Math.min(sw,sh);
+    const scale=crop.scale*(previewMinSide/minSide);
+    ctx.drawImage(crop.img, -sw*scale/2, -sh*scale/2, sw*scale, sh*scale);
+    ctx.restore();
+  } else {
+    ctx.save();
+    ctx.fillStyle='#fff';
+    ctx.beginPath();
+    ctx.arc(cx,cy,radius,0,Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  const overlayW = displayW || (cvs.width / dpr);
+  const overlayH = displayH || (cvs.height / dpr);
+  ctx.save();
+  ctx.fillStyle = 'rgba(0,0,0,0.45)';
+  ctx.fillRect(0,0,overlayW,overlayH);
+  ctx.globalCompositeOperation = 'destination-out';
   ctx.beginPath();
   ctx.arc(cx,cy,radius,0,Math.PI*2);
   ctx.fill();
-  if(!crop.img) return;
-
-  ctx.save();
-  ctx.beginPath();
-  ctx.arc(cx,cy,radius,0,Math.PI*2);
-  ctx.clip();
-  ctx.translate(cx + crop.tx, cy + crop.ty);
-  ctx.rotate(crop.rot||0);
-  const sw=crop.img.width, sh=crop.img.height;
-  const minSide=Math.min(sw,sh);
-  const scale=crop.scale*(previewMinSide/minSide);
-  ctx.drawImage(crop.img, -sw*scale/2, -sh*scale/2, sw*scale, sh*scale);
   ctx.restore();
+
+  if(radius>0){
+    ctx.save();
+    ctx.setLineDash([8,6]);
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+    ctx.beginPath();
+    ctx.arc(cx,cy,radius,0,Math.PI*2);
+    ctx.stroke();
+    ctx.restore();
+  }
 }
 
 function bindGenerate(){

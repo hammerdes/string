@@ -1,15 +1,16 @@
-import { setCanvasSize, hexToRGBA } from './utils.js';
+import { setCanvasSize, hexToRGBA, BOARD_MARGIN } from './utils.js';
 export function renderPinsAndStrings(canvas, size, pins, steps, opts){
   const css = Math.min(canvas.parentElement.clientWidth||size, size);
   const ctx = setCanvasSize(canvas, css);
   ctx.clearRect(0,0,canvas.width,canvas.height);
-  const s = canvas.clientWidth, cx = s/2, cy = s/2, rOuter = (s/2) - 8;
-  ctx.fillStyle = opts.board==='black' ? '#000' : '#fff';
-  ctx.beginPath(); ctx.arc(cx,cy, rOuter, 0, Math.PI*2); ctx.fill();
-  ctx.lineWidth = 10; ctx.strokeStyle = opts.board==='black' ? '#cfd6e6' : '#222';
-  ctx.beginPath(); ctx.arc(cx,cy, rOuter-1, 0, Math.PI*2); ctx.stroke();
-  ctx.fillStyle = '#e9e9e9';
+  const s = canvas.clientWidth, cx = s/2, cy = s/2;
   const scale = s/size;
+  const boardRadius = Math.max(0, (size/2 - BOARD_MARGIN) * scale);
+  ctx.fillStyle = opts.board==='black' ? '#000' : '#fff';
+  ctx.beginPath(); ctx.arc(cx,cy, boardRadius, 0, Math.PI*2); ctx.fill();
+  ctx.lineWidth = 10; ctx.strokeStyle = opts.board==='black' ? '#cfd6e6' : '#222';
+  ctx.beginPath(); ctx.arc(cx,cy, Math.max(0, boardRadius - Math.max(1, scale)), 0, Math.PI*2); ctx.stroke();
+  ctx.fillStyle = '#e9e9e9';
   for(const p of pins){ ctx.beginPath(); ctx.arc(p.x*scale, p.y*scale, (opts.pinSize||4)*scale, 0, Math.PI*2); ctx.fill(); }
   if(!steps || steps.length<2) return;
   ctx.save();
@@ -25,7 +26,7 @@ export function exportSVG(size, pins, steps, opts){
   const stroke = opts.color||'#000000', width = opts.widthPx||0.8;
   const svg = `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
-<defs><clipPath id="c"><circle cx="${size/2}" cy="${size/2}" r="${(size/2)-8}"/></clipPath></defs>
+<defs><clipPath id="c"><circle cx="${size/2}" cy="${size/2}" r="${(size/2)-BOARD_MARGIN}"/></clipPath></defs>
 <g clip-path="url(#c)" stroke="${stroke}" stroke-width="${width}" stroke-linecap="round" stroke-linejoin="round">
 ${lines.join('\n')}
 </g>
