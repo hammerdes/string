@@ -2,6 +2,8 @@ import * as State from './state.js';
 import { setCanvasSize, BOARD_MARGIN } from './utils.js';
 import { renderPinsAndStrings, exportSVG, exportCSV } from './renderer.js';
 
+const EXPORT_SIZE = 1440;
+
 let crop = { img:null, scale:1, tx:0, ty:0, rot:0, down:false, lx:0, ly:0, displaySize:0 };
 
 export function mount(){
@@ -107,14 +109,25 @@ function bindCrop(){
   cvs.addEventListener('pointerup', ()=>{ crop.down=false; });
 
   document.getElementById('crop-confirm').addEventListener('click', async()=>{
-    const SIZE = 1440;
+    const SIZE = EXPORT_SIZE;
+    const exportBoardSize = SIZE - BOARD_MARGIN * 2;
     const off = (typeof OffscreenCanvas!=='undefined') ? new OffscreenCanvas(SIZE,SIZE) : (()=>{const c=document.createElement('canvas'); c.width=SIZE; c.height=SIZE; return c;})();
     const octx = off.getContext('2d');
 
     octx.fillStyle = '#fff'; octx.fillRect(0,0,SIZE,SIZE);
     octx.save();
-    const previewSize = crop.displaySize || document.getElementById('crop-canvas')?.clientWidth || SIZE;
-    const ratio = (Number.isFinite(previewSize) && previewSize>0) ? (SIZE / previewSize) : 1;
+    const previewCanvas = document.getElementById('crop-canvas');
+    const fallbackPreviewSize = (()=>{
+      if(!previewCanvas) return 0;
+      const w = previewCanvas.clientWidth || 0;
+      const h = previewCanvas.clientHeight || 0;
+      const minSide = Math.min(w, h);
+      if(!(minSide>0)) return 0;
+      const margin = BOARD_MARGIN * (minSide / SIZE);
+      return Math.max(0, minSide - margin * 2);
+    })();
+    const previewSize = crop.displaySize || fallbackPreviewSize || exportBoardSize;
+    const ratio = (Number.isFinite(previewSize) && previewSize>0) ? (exportBoardSize / previewSize) : 1;
     const exportTx = crop.tx * ratio;
     const exportTy = crop.ty * ratio;
     octx.translate(SIZE/2 + exportTx, SIZE/2 + exportTy);
@@ -155,8 +168,11 @@ function drawCrop(){
   const previewMinSide = rawMin || (Math.min(cvs.width, cvs.height) / dpr) || rawMin || 1;
   const cx = displayW / 2;
   const cy = displayH / 2;
-  const radius = Math.max(0, previewMinSide / 2 - BOARD_MARGIN);
-  crop.displaySize = previewMinSide;
+  const sizeRatio = (Number.isFinite(previewMinSide) && previewMinSide>0) ? (previewMinSide / EXPORT_SIZE) : 0;
+  const cssMargin = BOARD_MARGIN * sizeRatio;
+  const boardDiameter = Math.max(0, previewMinSide - cssMargin * 2);
+  const radius = Math.max(0, boardDiameter / 2);
+  crop.displaySize = boardDiameter;
 
   ctx.save();
   ctx.setTransform(1,0,0,1,0,0);
