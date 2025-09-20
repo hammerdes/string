@@ -104,8 +104,22 @@ function bindCrop(){
   zoom.addEventListener('input', ()=>{ crop.scale=+zoom.value; drawCrop(); });
   rot.addEventListener('input', ()=>{ crop.rot = +rot.value * Math.PI/180; drawCrop(); });
 
-  cvs.addEventListener('pointerdown', e=>{ crop.down=true; crop.lx=e.clientX; crop.ly=e.clientY; cvs.setPointerCapture(e.pointerId); });
-  cvs.addEventListener('pointermove', e=>{ if(!crop.down) return; crop.tx+=(e.clientX-crop.lx); crop.ty+=(e.clientY-crop.ly); crop.lx=e.clientX; crop.ly=e.clientY; drawCrop(); });
+  cvs.addEventListener('pointerdown', e=>{
+    crop.down=true;
+    crop.lx=e.clientX;
+    crop.ly=e.clientY;
+    cvs.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+  cvs.addEventListener('pointermove', e=>{
+    if(!crop.down) return;
+    e.preventDefault();
+    crop.tx+=(e.clientX-crop.lx);
+    crop.ty+=(e.clientY-crop.ly);
+    crop.lx=e.clientX;
+    crop.ly=e.clientY;
+    drawCrop();
+  });
   cvs.addEventListener('pointerup', ()=>{ crop.down=false; });
 
   document.getElementById('crop-confirm').addEventListener('click', async()=>{
