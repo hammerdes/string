@@ -19,6 +19,7 @@ button.good{background:color-mix(in srgb, #22c55e 22%, #0f1320 78%);border-color
 input,select{width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--ring);background:#0f1320;color:var(--text)}
 .canvas-wrap{display:flex;justify-content:center;align-items:center;min-height:50vh}
 canvas{display:block;width:100%;height:auto;border-radius:12px;background:#111}
+#crop-canvas{touch-action:none}
 .list{list-style:none;margin:0;padding:0;display:grid;gap:8px}
 .list li{display:flex;justify-content:space-between;gap:8px;align-items:center;background:#0f1320;border:1px solid var(--ring);padding:8px 10px;border-radius:10px}
 .meter{height:10px;border-radius:999px;background:#0d1220;border:1px solid var(--ring);overflow:hidden;margin-top:8px}
