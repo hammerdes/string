@@ -3,62 +3,158 @@ import { setCanvasSize, BOARD_MARGIN } from './utils.js';
 import { renderPinsAndStrings, exportSVG, exportCSV } from './renderer.js';
 
 const EXPORT_SIZE = 1440;
+const AUTO_PLAY_SPEEDS = [1000, 2000, 3000, 5000, 10000, 15000, 30000];
+const DEFAULT_SPEED_INDEX = 2;
 let navButtons = [];
 let removeNavigateListener = null;
 
 let crop = { img:null, scale:1, tx:0, ty:0, rot:0, down:false, lx:0, ly:0, displaySize:0 };
 
 const viewerState = {
+  stepIndex: 0,
   steps: [],
-  current: 0,
-  max: 0,
-  playing: false,
-  timer: null,
-  speeds: [3000, 1500, 750, 300],
-  speedIndex: 0,
-  voice: false,
-  pinCount: 0
+  pinCount: 0,
+  autoPlayDelayMs: AUTO_PLAY_SPEEDS[DEFAULT_SPEED_INDEX],
+  autoPlayTimer: null,
+  isAutoPlaying: false,
+  isVoiceOn: false,
+  isVoiceSupported: typeof window !== 'undefined' && 'speechSynthesis' in window && typeof SpeechSynthesisUtterance !== 'undefined',
+  ui: {}
 };
 
-function setViewerSteps(steps, pinCount){
-  stopPlayback();
-  viewerState.steps = Array.isArray(steps) ? steps.filter(n=>Number.isFinite(n)) : [];
-  viewerState.pinCount = Number.isFinite(pinCount) ? pinCount : 0;
-  viewerState.max = viewerState.steps.length>0 ? viewerState.steps.length-1 : 0;
-  viewerState.current = viewerState.steps.length>0 ? viewerState.max : 0;
-  updateProgressUI();
-  updateControlsState();
-  updateSpeedLabel();
-  updateVoiceButton();
+function resetViewer(){
+  stopAutoPlay({ updateButton: false });
+  viewerState.stepIndex = 0;
+  viewerState.steps = [];
+  viewerState.pinCount = 0;
+  viewerState.autoPlayDelayMs = AUTO_PLAY_SPEEDS[DEFAULT_SPEED_INDEX];
+  viewerState.isVoiceOn = false;
+  clearViewer();
+  updateProgressIndicators();
+  updateTransportState();
   updatePlayButton();
-  return viewerState.steps.length>0;
+  updateSpeedButton();
+  updateVoiceButton();
 }
 
-function updateProgressUI(){
-  const label = document.getElementById('e4-progress-label');
-  const fill = document.getElementById('e4-progress-fill');
-  const bar = document.querySelector('.e4-progress-bar');
+function stopAutoPlay({updateButton = true} = {}){
+  if(viewerState.autoPlayTimer){
+    clearTimeout(viewerState.autoPlayTimer);
+    viewerState.autoPlayTimer = null;
+  }
+  const wasPlaying = viewerState.isAutoPlaying;
+  viewerState.isAutoPlaying = false;
+  if(wasPlaying && updateButton){
+    updatePlayButton();
+  }
+}
+
+function toggleAutoPlay(){
+  if(viewerState.isAutoPlaying){
+    stopAutoPlay();
+    return;
+  }
+  if(viewerState.steps.length === 0) return;
+  if(viewerState.stepIndex >= viewerState.steps.length - 1){
+    setStep(0, { announce: false });
+  }
+  viewerState.isAutoPlaying = true;
+  updatePlayButton();
+  scheduleNextStep();
+}
+
+function scheduleNextStep(){
+  if(viewerState.autoPlayTimer){
+    clearTimeout(viewerState.autoPlayTimer);
+    viewerState.autoPlayTimer = null;
+  }
+  if(!viewerState.isAutoPlaying) return;
   const total = viewerState.steps.length;
-  const current = total>0 ? viewerState.current+1 : 0;
-  if(label){
-    label.textContent = total>0 ? current + ' / ' + total : '0 / 0';
+  if(total === 0){
+    stopAutoPlay();
+    return;
   }
-  if(fill){
-    const pct = total>0 ? (current/total)*100 : 0;
-    fill.style.width = pct.toFixed(1) + '%';
+  if(viewerState.stepIndex >= total - 1){
+    stopAutoPlay();
+    return;
   }
-  if(bar){
-    bar.setAttribute('aria-valuemin', '0');
-    bar.setAttribute('aria-valuemax', String(total));
-    bar.setAttribute('aria-valuenow', String(current));
-  }
-  updateStepCell('e4-prev-pin', viewerState.steps[viewerState.current-1]);
-  updateStepCell('e4-current-pin', viewerState.steps[viewerState.current]);
-  updateStepCell('e4-next-pin', viewerState.steps[viewerState.current+1]);
+  const delay = viewerState.autoPlayDelayMs || AUTO_PLAY_SPEEDS[0];
+  viewerState.autoPlayTimer = setTimeout(()=>{
+    setStep(viewerState.stepIndex + 1, { announce: true });
+  }, delay);
 }
 
-function updateStepCell(id, value){
-  const cell = document.getElementById(id);
+function cycleAutoPlaySpeed(){
+  const currentIndex = AUTO_PLAY_SPEEDS.indexOf(viewerState.autoPlayDelayMs);
+  const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % AUTO_PLAY_SPEEDS.length : DEFAULT_SPEED_INDEX;
+  viewerState.autoPlayDelayMs = AUTO_PLAY_SPEEDS[nextIndex];
+  updateSpeedButton();
+  if(viewerState.isAutoPlaying){
+    scheduleNextStep();
+  }
+}
+
+function toggleVoice(){
+  if(!viewerState.isVoiceSupported) return;
+  viewerState.isVoiceOn = !viewerState.isVoiceOn;
+  if(!viewerState.isVoiceOn && typeof window !== 'undefined' && window.speechSynthesis){
+    window.speechSynthesis.cancel();
+  }
+  updateVoiceButton();
+  if(viewerState.isVoiceOn){
+    announcePin(viewerState.steps[viewerState.stepIndex]);
+  }
+}
+
+function setStep(index, {announce = true} = {}){
+  const total = viewerState.steps.length;
+  if(total === 0){
+    viewerState.stepIndex = 0;
+    clearViewer();
+    updateProgressIndicators();
+    updateTransportState();
+    updateVoiceButton();
+    if(viewerState.isAutoPlaying){
+      stopAutoPlay();
+    }
+    return;
+  }
+  const clamped = Math.max(0, Math.min(index, total - 1));
+  viewerState.stepIndex = clamped;
+  drawViewer(clamped);
+  updateProgressIndicators();
+  updateTransportState();
+  updateVoiceButton();
+  if(viewerState.isAutoPlaying){
+    scheduleNextStep();
+  }
+  if(announce && viewerState.isVoiceOn){
+    announcePin(viewerState.steps[clamped]);
+  }
+}
+
+function updateProgressIndicators(){
+  const { progressLabel, progressFill, progressBar, prevPinCell, currentPinCell, nextPinCell } = viewerState.ui;
+  const total = viewerState.steps.length;
+  const current = total > 0 ? viewerState.stepIndex + 1 : 0;
+  if(progressLabel){
+    progressLabel.textContent = `Step ${current} / ${total}`;
+  }
+  if(progressFill){
+    const pct = total > 0 ? ((viewerState.stepIndex + 1) / total) * 100 : 0;
+    progressFill.style.width = pct.toFixed(1) + '%';
+  }
+  if(progressBar){
+    progressBar.setAttribute('aria-valuemin', '0');
+    progressBar.setAttribute('aria-valuemax', String(total));
+    progressBar.setAttribute('aria-valuenow', String(current));
+  }
+  updateStepCell(prevPinCell, viewerState.steps[viewerState.stepIndex - 1]);
+  updateStepCell(currentPinCell, viewerState.steps[viewerState.stepIndex]);
+  updateStepCell(nextPinCell, viewerState.steps[viewerState.stepIndex + 1]);
+}
+
+function updateStepCell(cell, value){
   if(!cell) return;
   const valueEl = cell.querySelector('[data-value]');
   const placeholderEl = cell.querySelector('[data-placeholder]');
@@ -71,125 +167,114 @@ function updateStepCell(id, value){
   }
 }
 
-function updateControlsState(){
-  const hasSteps = viewerState.steps.length>0;
-  setDisabled('e4-first', !hasSteps || viewerState.current<=0);
-  setDisabled('e4-prev', !hasSteps || viewerState.current<=0);
-  setDisabled('e4-next', !hasSteps || viewerState.current>=viewerState.max);
-  setDisabled('e4-last', !hasSteps || viewerState.current>=viewerState.max);
-  setDisabled('e4-play', !hasSteps);
-  setDisabled('e4-speed', !hasSteps);
-  setDisabled('e4-step-jump', !hasSteps);
-  setDisabled('e4-voice', !hasSteps);
+function updateTransportState(){
+  const { firstButton, prevButton, nextButton, lastButton, playButton, speedButton, jumpButton, voiceButton } = viewerState.ui;
+  const total = viewerState.steps.length;
+  const hasData = total > 0 && Number.isFinite(viewerState.pinCount) && viewerState.pinCount > 0;
+  setDisabled(firstButton, !hasData || viewerState.stepIndex <= 0);
+  setDisabled(prevButton, !hasData || viewerState.stepIndex <= 0);
+  setDisabled(nextButton, !hasData || viewerState.stepIndex >= total - 1);
+  setDisabled(lastButton, !hasData || viewerState.stepIndex >= total - 1);
+  setDisabled(playButton, !hasData);
+  setDisabled(speedButton, !hasData);
+  setDisabled(jumpButton, !hasData);
+  if(voiceButton){
+    const voiceDisabled = !hasData || !viewerState.isVoiceSupported;
+    voiceButton.disabled = voiceDisabled;
+    if(voiceDisabled){
+      voiceButton.setAttribute('aria-disabled', 'true');
+    } else {
+      voiceButton.removeAttribute('aria-disabled');
+    }
+  }
 }
 
-function setDisabled(id, disabled){
-  const el = document.getElementById(id);
-  if(el) el.disabled = disabled;
+function setDisabled(el, disabled){
+  if(!el) return;
+  el.disabled = !!disabled;
+  if(disabled){
+    el.setAttribute('aria-disabled', 'true');
+  } else {
+    el.removeAttribute('aria-disabled');
+  }
 }
 
-function updateSpeedLabel(){
-  const btn = document.getElementById('e4-speed');
-  if(!btn) return;
-  const ms = viewerState.speeds[viewerState.speedIndex] || 1000;
+function updateSpeedButton(){
+  const { speedButton } = viewerState.ui;
+  if(!speedButton) return;
+  const ms = viewerState.autoPlayDelayMs || AUTO_PLAY_SPEEDS[0];
   const secs = ms / 1000;
   const label = secs >= 1 ? ((Number.isInteger(secs) ? secs.toFixed(0) : secs.toFixed(1)) + 's') : (ms + 'ms');
-  btn.textContent = 'Speed ' + label;
+  speedButton.textContent = 'Speed ' + label;
 }
 
 function updatePlayButton(){
-  const btn = document.getElementById('e4-play');
-  if(!btn) return;
-  btn.textContent = viewerState.playing ? 'Pause' : 'Play';
-  btn.setAttribute('aria-pressed', viewerState.playing ? 'true' : 'false');
+  const { playButton } = viewerState.ui;
+  if(!playButton) return;
+  playButton.textContent = viewerState.isAutoPlaying ? 'Pause' : 'Play';
+  playButton.setAttribute('aria-pressed', viewerState.isAutoPlaying ? 'true' : 'false');
 }
 
 function updateVoiceButton(){
-  const btn = document.getElementById('e4-voice');
-  if(!btn) return;
-  btn.textContent = viewerState.voice ? 'Voice On' : 'Voice Off';
-  btn.setAttribute('aria-pressed', viewerState.voice ? 'true' : 'false');
-}
-
-function toggleVoice(){
-  viewerState.voice = !viewerState.voice;
-  updateVoiceButton();
-}
-
-function startPlayback(){
-  if(viewerState.steps.length===0) return;
-  if(viewerState.current>=viewerState.max){
-    goToStep(0);
-  }
-  viewerState.playing = true;
-  updatePlayButton();
-  schedulePlayback();
-}
-
-function stopPlayback(){
-  if(viewerState.timer){
-    clearTimeout(viewerState.timer);
-    viewerState.timer = null;
-  }
-  if(viewerState.playing){
-    viewerState.playing = false;
-    updatePlayButton();
-  }
-}
-
-function togglePlayback(){
-  if(viewerState.playing){
-    stopPlayback();
-  } else {
-    startPlayback();
-  }
-}
-
-function schedulePlayback(){
-  if(viewerState.timer){
-    clearTimeout(viewerState.timer);
-    viewerState.timer = null;
-  }
-  if(!viewerState.playing) return;
-  const delay = viewerState.speeds[viewerState.speedIndex] || 1000;
-  viewerState.timer = setTimeout(()=>{
-    if(viewerState.current>=viewerState.max){
-      stopPlayback();
-      return;
+  const { voiceButton, voiceInfo } = viewerState.ui;
+  if(!voiceButton) return;
+  if(!viewerState.isVoiceSupported){
+    voiceButton.textContent = 'Voice Unavailable';
+    voiceButton.disabled = true;
+    voiceButton.setAttribute('aria-pressed', 'false');
+    voiceButton.setAttribute('aria-disabled', 'true');
+    if(voiceInfo){
+      voiceInfo.hidden = false;
     }
-    goToStep(viewerState.current+1);
-    schedulePlayback();
-  }, delay);
-}
-
-function cycleSpeed(){
-  viewerState.speedIndex = (viewerState.speedIndex + 1) % viewerState.speeds.length;
-  updateSpeedLabel();
-  if(viewerState.playing){
-    schedulePlayback();
-  }
-}
-
-function goToStep(step){
-  if(viewerState.steps.length===0){
-    viewerState.current = 0;
-    clearViewer();
-    updateProgressUI();
-    updateControlsState();
     return;
   }
-  const clamped = Math.max(0, Math.min(step, viewerState.max));
-  viewerState.current = clamped;
-  drawViewer(clamped);
-  updateProgressUI();
-  updateControlsState();
+  const hasSteps = viewerState.steps.length > 0 && Number.isFinite(viewerState.pinCount) && viewerState.pinCount > 0;
+  voiceButton.disabled = !hasSteps;
+  if(!hasSteps){
+    voiceButton.setAttribute('aria-disabled', 'true');
+  } else {
+    voiceButton.removeAttribute('aria-disabled');
+  }
+  voiceButton.textContent = viewerState.isVoiceOn ? 'Voice On' : 'Voice Off';
+  voiceButton.setAttribute('aria-pressed', viewerState.isVoiceOn ? 'true' : 'false');
+  if(voiceInfo){
+    voiceInfo.hidden = true;
+  }
+}
+
+function announcePin(pinNumber){
+  if(!viewerState.isVoiceSupported || !viewerState.isVoiceOn) return;
+  if(!Number.isFinite(pinNumber)) return;
+  try{
+    if(typeof window !== 'undefined' && window.speechSynthesis){
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(`Pin ${pinNumber}`);
+      utterance.lang = 'en-US';
+      window.speechSynthesis.speak(utterance);
+    }
+  } catch(err){
+    // ignore speech synthesis errors
+  }
 }
 
 function clearViewer(){
-  const canvas = document.getElementById('viewer-canvas');
+  const canvas = viewerState.ui.canvas || document.getElementById('viewer-canvas');
   if(!canvas) return;
   const ctx = canvas.getContext('2d');
   if(ctx) ctx.clearRect(0,0,canvas.width,canvas.height);
+}
+
+function applyViewerSteps(steps, pinCount, {announce = false} = {}){
+  const normalizedSteps = Array.isArray(steps) ? steps.filter(n=>Number.isFinite(n)) : [];
+  const normalizedPinCount = Number.isFinite(pinCount) ? pinCount : 0;
+  stopAutoPlay();
+  viewerState.steps = normalizedSteps;
+  viewerState.pinCount = normalizedPinCount;
+  viewerState.stepIndex = 0;
+  updateSpeedButton();
+  updatePlayButton();
+  const shouldAnnounce = announce && normalizedSteps.length>0 && normalizedPinCount>0;
+  setStep(0, { announce: shouldAnnounce });
 }
 
 export function mount(){
@@ -269,11 +354,9 @@ function hydrateProjectView(){
   }
 
   const hasDrawable = steps.length>0 && hasPins && p.size;
-  setViewerSteps(steps, pinCount);
+  applyViewerSteps(hasDrawable ? steps : [], hasPins ? pinCount : 0, {announce:false});
 
-  if(hasDrawable){
-    goToStep(viewerState.current);
-  } else if(viewerCanvas){
+  if(!hasDrawable && viewerCanvas){
     const vctx=viewerCanvas.getContext('2d');
     if(vctx) vctx.clearRect(0,0,viewerCanvas.width, viewerCanvas.height);
   }
@@ -482,8 +565,7 @@ function bindGenerate(){
         previewState.size = data.size;
         previewState.lastCount = data.steps.length;
         previewState.renderedStep = data.steps.length-1;
-        setViewerSteps(data.steps, p.params.pins);
-        goToStep(viewerState.current);
+        applyViewerSteps(data.steps, p.params.pins, {announce:false});
       } else if(type==='status'){
         if(data.state==='paused'){
           stat.textContent='Paused';
@@ -523,38 +605,94 @@ function bindGenerate(){
 }
 
 function bindViewer(){
-  const canvas=document.getElementById('viewer-canvas');
-  const expPNG=document.getElementById('exp-png'); const expSVGb=document.getElementById('exp-svg'); const expCSVb=document.getElementById('exp-csv'); const expJSONb=document.getElementById('exp-json');
+  const ui = viewerState.ui;
+  ui.canvas = document.getElementById('viewer-canvas');
+  ui.firstButton = document.getElementById('e4-first');
+  ui.prevButton = document.getElementById('e4-prev');
+  ui.playButton = document.getElementById('e4-play');
+  ui.nextButton = document.getElementById('e4-next');
+  ui.lastButton = document.getElementById('e4-last');
+  ui.speedButton = document.getElementById('e4-speed');
+  ui.voiceButton = document.getElementById('e4-voice');
+  ui.jumpButton = document.getElementById('e4-step-jump');
+  ui.progressFill = document.getElementById('e4-progress-fill');
+  ui.progressLabel = document.getElementById('e4-progress-label');
+  ui.progressBar = document.querySelector('.e4-progress-bar');
+  ui.prevPinCell = document.getElementById('e4-prev-pin');
+  ui.currentPinCell = document.getElementById('e4-current-pin');
+  ui.nextPinCell = document.getElementById('e4-next-pin');
 
-  const firstBtn=document.getElementById('e4-first');
-  const lastBtn=document.getElementById('e4-last');
-  const prevBtn=document.getElementById('e4-prev');
-  const nextBtn=document.getElementById('e4-next');
-  const playBtn=document.getElementById('e4-play');
-  const speedBtn=document.getElementById('e4-speed');
-  const voiceBtn=document.getElementById('e4-voice');
-  const jumpBtn=document.getElementById('e4-step-jump');
+  const canvas = ui.canvas;
+  const expPNG = document.getElementById('exp-png');
+  const expSVGb = document.getElementById('exp-svg');
+  const expCSVb = document.getElementById('exp-csv');
+  const expJSONb = document.getElementById('exp-json');
 
-  if(firstBtn){ firstBtn.addEventListener('click', ()=>{ stopPlayback(); goToStep(0); }); }
-  if(lastBtn){ lastBtn.addEventListener('click', ()=>{ stopPlayback(); goToStep(viewerState.max); }); }
-  if(prevBtn){ prevBtn.addEventListener('click', ()=>{ stopPlayback(); goToStep(viewerState.current-1); }); }
-  if(nextBtn){ nextBtn.addEventListener('click', ()=>{ stopPlayback(); goToStep(viewerState.current+1); }); }
-  if(playBtn){ playBtn.addEventListener('click', togglePlayback); }
-  if(speedBtn){ speedBtn.addEventListener('click', cycleSpeed); }
-  if(voiceBtn){ voiceBtn.addEventListener('click', toggleVoice); }
-  if(jumpBtn){
-    jumpBtn.addEventListener('click', ()=>{
+  if(ui.firstButton){
+    ui.firstButton.addEventListener('click', ()=>{
+      stopAutoPlay();
+      setStep(0, {announce:true});
+    });
+  }
+  if(ui.lastButton){
+    ui.lastButton.addEventListener('click', ()=>{
+      stopAutoPlay();
+      setStep(viewerState.steps.length - 1, {announce:true});
+    });
+  }
+  if(ui.prevButton){
+    ui.prevButton.addEventListener('click', ()=>{
+      stopAutoPlay();
+      setStep(viewerState.stepIndex - 1, {announce:true});
+    });
+  }
+  if(ui.nextButton){
+    ui.nextButton.addEventListener('click', ()=>{
+      stopAutoPlay();
+      setStep(viewerState.stepIndex + 1, {announce:true});
+    });
+  }
+  if(ui.playButton){ ui.playButton.addEventListener('click', toggleAutoPlay); }
+  if(ui.speedButton){ ui.speedButton.addEventListener('click', cycleAutoPlaySpeed); }
+  if(ui.voiceButton){ ui.voiceButton.addEventListener('click', toggleVoice); }
+  if(ui.jumpButton){
+    ui.jumpButton.addEventListener('click', ()=>{
       if(viewerState.steps.length===0) return;
-      const total = viewerState.steps.length;
-      const input = prompt('Go to step (1-' + total + ')', String(viewerState.current+1));
+      const maxIndex = viewerState.steps.length - 1;
+      const input = prompt(`Go to step (0-${maxIndex})`, String(viewerState.stepIndex));
       if(input===null) return;
       const num = Number.parseInt(input, 10);
       if(Number.isFinite(num)){
-        const clamped = Math.max(1, Math.min(num, total));
-        stopPlayback();
-        goToStep(clamped-1);
+        const clamped = Math.max(0, Math.min(num, maxIndex));
+        stopAutoPlay();
+        setStep(clamped, {announce:true});
       }
     });
+  }
+
+  if(ui.progressBar){
+    ui.progressBar.addEventListener('pointerdown', e=>{
+      if(viewerState.steps.length===0) return;
+      const rect = ui.progressBar.getBoundingClientRect();
+      const ratio = rect.width>0 ? (e.clientX - rect.left) / rect.width : 0;
+      const clampedRatio = Math.max(0, Math.min(1, ratio));
+      const targetIndex = Math.round(clampedRatio * (viewerState.steps.length - 1));
+      stopAutoPlay();
+      setStep(targetIndex, {announce:true});
+      e.preventDefault();
+    });
+  }
+
+  if(ui.voiceButton && !viewerState.isVoiceSupported){
+    if(!ui.voiceInfo){
+      const info = document.createElement('span');
+      info.className = 'tiny e4-voice-info';
+      info.textContent = 'Speech synthesis not supported in this browser.';
+      ui.voiceButton.insertAdjacentElement('afterend', info);
+      ui.voiceInfo = info;
+    } else {
+      ui.voiceInfo.hidden = false;
+    }
   }
 
   if(expPNG){ expPNG.addEventListener('click', ()=>{ if(!canvas) return; const url=canvas.toDataURL('image/png'); downloadURL(url,'string-art.png'); }); }
@@ -562,49 +700,40 @@ function bindViewer(){
   if(expCSVb){ expCSVb.addEventListener('click', ()=>{ const p=State.get().project; if(!p) return; const steps=(p.stepsCSV||'').split(',').map(s=>+s).filter(n=>Number.isFinite(n)); const blob=exportCSV(steps, buildPins(p.size, p.params.pins)); const url=URL.createObjectURL(blob); downloadURL(url,'string-art.csv'); URL.revokeObjectURL(url); }); }
   if(expJSONb){ expJSONb.addEventListener('click', ()=>{ const p=State.get().project; if(!p) return; const preset={brand:'Hammer Design', pins:p.params.pins, strings:p.params.strings, minDist:p.params.minDist, fade:p.params.fade, widthPx:p.params.widthPx, alpha:p.params.alpha, color:p.params.color, board:p.params.board, seed:p.params.seed, locale:(navigator.language||'en').slice(0,2), watermark:'© 2025 Hammer Design'}; const blob=new Blob([JSON.stringify(preset,null,2)], {type:'application/json'}); const url=URL.createObjectURL(blob); downloadURL(url,'preset.json'); URL.revokeObjectURL(url); }); }
 
-  updateProgressUI();
-  updateControlsState();
-  updateSpeedLabel();
-  updateVoiceButton();
-  updatePlayButton();
-
   function downloadURL(url,name){ const a=document.createElement('a'); a.href=url; a.download=name; a.click(); }
+
+  if(viewerState.steps.length === 0){
+    resetViewer();
+  } else {
+    updateProgressIndicators();
+    updateTransportState();
+    updateSpeedButton();
+    updateVoiceButton();
+    updatePlayButton();
+  }
 }
 
-function drawViewer(k){
-  const p=State.get().project;
-  const canvas=document.getElementById('viewer-canvas');
+function drawViewer(stepIndex){
+  const p = State.get().project;
+  const canvas = viewerState.ui.canvas || document.getElementById('viewer-canvas');
   if(!p || !canvas){
     clearViewer();
     return;
   }
 
-  let allSteps=viewerState.steps;
-  if(!allSteps || allSteps.length===0){
-    const stepsCSV=(p.stepsCSV||'').trim();
-    allSteps=stepsCSV ? stepsCSV.split(',').map(s=>Number(s)).filter(n=>Number.isFinite(n)) : [];
-    if(allSteps.length>0){
-      viewerState.steps = allSteps;
-      viewerState.max = allSteps.length-1;
-      viewerState.current = Math.min(k, viewerState.max);
-    }
-  }
-
-  if(!allSteps || allSteps.length===0){
-    clearViewer();
-    return;
-  }
-
+  const steps = viewerState.steps;
   const pinCountCandidate = Number.isFinite(viewerState.pinCount) && viewerState.pinCount>0 ? viewerState.pinCount : Number(p.params?.pins);
-  const pinCount=Number(pinCountCandidate);
-  if(!Number.isFinite(pinCount) || pinCount<=0 || !p.size){
+  const pinCount = Number(pinCountCandidate);
+
+  if(!Array.isArray(steps) || steps.length===0 || !Number.isFinite(pinCount) || pinCount<=0 || !p.size){
     clearViewer();
     return;
   }
 
-  const steps=allSteps.slice(0, Math.min(k+1, allSteps.length));
-  const pins=buildPins(p.size, pinCount);
-  renderPinsAndStrings(canvas, p.size, pins, steps, p.params);
+  const clamped = Math.max(0, Math.min(stepIndex, steps.length-1));
+  const subset = steps.slice(0, clamped+1);
+  const pins = buildPins(p.size, pinCount);
+  renderPinsAndStrings(canvas, p.size, pins, subset, p.params);
 }
 
 function buildPins(size, n){
