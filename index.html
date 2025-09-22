@@ -82,7 +82,7 @@
   <section id="screen-4" class="screen" role="region" aria-label="Steps">
     <div class="panel">
       <div class="e4-board-wrap">
-        <div class="e4-export-row">
+        <div class="e4-toolbar">
           <button id="exp-png" class="good">Export PNG</button>
           <button id="exp-svg">Export SVG</button>
           <button id="exp-csv">Export CSV</button>
@@ -96,7 +96,7 @@
         <div class="e4-progress-center">
           <span id="e4-progress-label">0 / 0</span>
           <div class="e4-progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0">
-            <i id="e4-progress-fill"></i>
+            <i id="e4-progress-fill" class="e4-progress-fill"></i>
           </div>
         </div>
         <div class="e4-progress-actions">
@@ -106,28 +106,28 @@
       </div>
 
       <div class="e4-step-cells">
-        <div id="e4-prev-pin" class="e4-step-cell">
+        <div id="e4-prev-pin" class="e4-step-cell e4-cell">
           <span class="e4-step-value" data-value></span>
           <span class="e4-step-placeholder" data-placeholder>—</span>
         </div>
-        <div id="e4-current-pin" class="e4-step-cell">
+        <div id="e4-current-pin" class="e4-step-cell e4-cell">
           <span class="e4-step-value" data-value></span>
           <span class="e4-step-placeholder" data-placeholder>—</span>
         </div>
-        <div id="e4-next-pin" class="e4-step-cell">
+        <div id="e4-next-pin" class="e4-step-cell e4-cell">
           <span class="e4-step-value" data-value></span>
           <span class="e4-step-placeholder" data-placeholder>—</span>
         </div>
       </div>
 
       <div class="e4-controls">
-        <button id="e4-speed" class="e4-control-speed">Speed 3s</button>
-        <div class="e4-control-group">
+        <button id="e4-speed" class="e4-control-speed e4-speed">Speed 3s</button>
+        <div class="e4-control-group e4-transport">
           <button id="e4-prev">Prev</button>
           <button id="e4-play" aria-pressed="false">Play</button>
           <button id="e4-next">Next</button>
         </div>
-        <button id="e4-voice" class="e4-control-voice" aria-pressed="false">Voice Off</button>
+        <button id="e4-voice" class="e4-control-voice e4-voice" aria-pressed="false">Voice Off</button>
       </div>
       <div class="tiny">© 2025 Hammer Design</div>
     </div>
