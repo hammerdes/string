@@ -1,12 +1,15 @@
 import { idbPutBlob, idbGetBlob } from './utils.js';
 const LS_KEY = 'sa.projects.v1';
 const state = { screen: 1, project: null };
+const navigateListeners = new Set();
 export function go(n){
   state.screen = n;
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   const el = document.getElementById(`screen-${n}`);
   if(el) el.classList.add('active');
+  navigateListeners.forEach(fn=>{ try{ fn(n); }catch(err){ console.error(err); } });
 }
+export function onNavigate(fn){ if(typeof fn==='function') navigateListeners.add(fn); return ()=>navigateListeners.delete(fn); }
 export function newProjectFromImage(file){
   const id = 'p_' + Date.now().toString(36);
   const proj = { id, name: file.name || 'Untitled', createdAt: Date.now(), updatedAt: Date.now(),

@@ -3,6 +3,8 @@ import { setCanvasSize, BOARD_MARGIN } from './utils.js';
 import { renderPinsAndStrings, exportSVG, exportCSV } from './renderer.js';
 
 const EXPORT_SIZE = 1440;
+let navButtons = [];
+let removeNavigateListener = null;
 
 let crop = { img:null, scale:1, tx:0, ty:0, rot:0, down:false, lx:0, ly:0, displaySize:0 };
 
@@ -191,9 +193,26 @@ function clearViewer(){
 }
 
 export function mount(){
-  document.querySelectorAll('header nav [data-nav]').forEach(b=>{ b.addEventListener('click', ()=>State.go(+b.dataset.nav)); });
+  navButtons = Array.from(document.querySelectorAll('.app-nav [data-nav]'));
+  navButtons.forEach(b=>{ b.addEventListener('click', ()=>State.go(+b.dataset.nav)); });
+  setActiveNav(State.get().screen);
+  if(removeNavigateListener) removeNavigateListener();
+  removeNavigateListener = State.onNavigate(setActiveNav);
   const file = document.getElementById('e1-file'); file.addEventListener('change', onPickImage);
   refreshProjectList(); bindCrop(); bindGenerate(); bindViewer();
+}
+
+function setActiveNav(screenId){
+  const target = Number(screenId);
+  navButtons.forEach(btn=>{
+    const isActive = Number(btn.dataset.nav) === target;
+    btn.classList.toggle('is-active', isActive);
+    if(isActive){
+      btn.setAttribute('aria-current','page');
+    } else {
+      btn.removeAttribute('aria-current');
+    }
+  });
 }
 
 function refreshProjectList(){
