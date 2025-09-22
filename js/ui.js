@@ -6,6 +6,190 @@ const EXPORT_SIZE = 1440;
 
 let crop = { img:null, scale:1, tx:0, ty:0, rot:0, down:false, lx:0, ly:0, displaySize:0 };
 
+const viewerState = {
+  steps: [],
+  current: 0,
+  max: 0,
+  playing: false,
+  timer: null,
+  speeds: [3000, 1500, 750, 300],
+  speedIndex: 0,
+  voice: false,
+  pinCount: 0
+};
+
+function setViewerSteps(steps, pinCount){
+  stopPlayback();
+  viewerState.steps = Array.isArray(steps) ? steps.filter(n=>Number.isFinite(n)) : [];
+  viewerState.pinCount = Number.isFinite(pinCount) ? pinCount : 0;
+  viewerState.max = viewerState.steps.length>0 ? viewerState.steps.length-1 : 0;
+  viewerState.current = viewerState.steps.length>0 ? viewerState.max : 0;
+  updateProgressUI();
+  updateControlsState();
+  updateSpeedLabel();
+  updateVoiceButton();
+  updatePlayButton();
+  return viewerState.steps.length>0;
+}
+
+function updateProgressUI(){
+  const label = document.getElementById('e4-progress-label');
+  const fill = document.getElementById('e4-progress-fill');
+  const bar = document.querySelector('.e4-progress-bar');
+  const total = viewerState.steps.length;
+  const current = total>0 ? viewerState.current+1 : 0;
+  if(label){
+    label.textContent = total>0 ? current + ' / ' + total : '0 / 0';
+  }
+  if(fill){
+    const pct = total>0 ? (current/total)*100 : 0;
+    fill.style.width = pct.toFixed(1) + '%';
+  }
+  if(bar){
+    bar.setAttribute('aria-valuemin', '0');
+    bar.setAttribute('aria-valuemax', String(total));
+    bar.setAttribute('aria-valuenow', String(current));
+  }
+  updateStepCell('e4-prev-pin', viewerState.steps[viewerState.current-1]);
+  updateStepCell('e4-current-pin', viewerState.steps[viewerState.current]);
+  updateStepCell('e4-next-pin', viewerState.steps[viewerState.current+1]);
+}
+
+function updateStepCell(id, value){
+  const cell = document.getElementById(id);
+  if(!cell) return;
+  const valueEl = cell.querySelector('[data-value]');
+  const placeholderEl = cell.querySelector('[data-placeholder]');
+  if(Number.isFinite(value)){
+    if(valueEl){ valueEl.hidden = false; valueEl.textContent = value; }
+    if(placeholderEl){ placeholderEl.hidden = true; }
+  } else {
+    if(valueEl){ valueEl.hidden = true; valueEl.textContent = ''; }
+    if(placeholderEl){ placeholderEl.hidden = false; }
+  }
+}
+
+function updateControlsState(){
+  const hasSteps = viewerState.steps.length>0;
+  setDisabled('e4-first', !hasSteps || viewerState.current<=0);
+  setDisabled('e4-prev', !hasSteps || viewerState.current<=0);
+  setDisabled('e4-next', !hasSteps || viewerState.current>=viewerState.max);
+  setDisabled('e4-last', !hasSteps || viewerState.current>=viewerState.max);
+  setDisabled('e4-play', !hasSteps);
+  setDisabled('e4-speed', !hasSteps);
+  setDisabled('e4-step-jump', !hasSteps);
+  setDisabled('e4-voice', !hasSteps);
+}
+
+function setDisabled(id, disabled){
+  const el = document.getElementById(id);
+  if(el) el.disabled = disabled;
+}
+
+function updateSpeedLabel(){
+  const btn = document.getElementById('e4-speed');
+  if(!btn) return;
+  const ms = viewerState.speeds[viewerState.speedIndex] || 1000;
+  const secs = ms / 1000;
+  const label = secs >= 1 ? ((Number.isInteger(secs) ? secs.toFixed(0) : secs.toFixed(1)) + 's') : (ms + 'ms');
+  btn.textContent = 'Speed ' + label;
+}
+
+function updatePlayButton(){
+  const btn = document.getElementById('e4-play');
+  if(!btn) return;
+  btn.textContent = viewerState.playing ? 'Pause' : 'Play';
+  btn.setAttribute('aria-pressed', viewerState.playing ? 'true' : 'false');
+}
+
+function updateVoiceButton(){
+  const btn = document.getElementById('e4-voice');
+  if(!btn) return;
+  btn.textContent = viewerState.voice ? 'Voice On' : 'Voice Off';
+  btn.setAttribute('aria-pressed', viewerState.voice ? 'true' : 'false');
+}
+
+function toggleVoice(){
+  viewerState.voice = !viewerState.voice;
+  updateVoiceButton();
+}
+
+function startPlayback(){
+  if(viewerState.steps.length===0) return;
+  if(viewerState.current>=viewerState.max){
+    goToStep(0);
+  }
+  viewerState.playing = true;
+  updatePlayButton();
+  schedulePlayback();
+}
+
+function stopPlayback(){
+  if(viewerState.timer){
+    clearTimeout(viewerState.timer);
+    viewerState.timer = null;
+  }
+  if(viewerState.playing){
+    viewerState.playing = false;
+    updatePlayButton();
+  }
+}
+
+function togglePlayback(){
+  if(viewerState.playing){
+    stopPlayback();
+  } else {
+    startPlayback();
+  }
+}
+
+function schedulePlayback(){
+  if(viewerState.timer){
+    clearTimeout(viewerState.timer);
+    viewerState.timer = null;
+  }
+  if(!viewerState.playing) return;
+  const delay = viewerState.speeds[viewerState.speedIndex] || 1000;
+  viewerState.timer = setTimeout(()=>{
+    if(viewerState.current>=viewerState.max){
+      stopPlayback();
+      return;
+    }
+    goToStep(viewerState.current+1);
+    schedulePlayback();
+  }, delay);
+}
+
+function cycleSpeed(){
+  viewerState.speedIndex = (viewerState.speedIndex + 1) % viewerState.speeds.length;
+  updateSpeedLabel();
+  if(viewerState.playing){
+    schedulePlayback();
+  }
+}
+
+function goToStep(step){
+  if(viewerState.steps.length===0){
+    viewerState.current = 0;
+    clearViewer();
+    updateProgressUI();
+    updateControlsState();
+    return;
+  }
+  const clamped = Math.max(0, Math.min(step, viewerState.max));
+  viewerState.current = clamped;
+  drawViewer(clamped);
+  updateProgressUI();
+  updateControlsState();
+}
+
+function clearViewer(){
+  const canvas = document.getElementById('viewer-canvas');
+  if(!canvas) return;
+  const ctx = canvas.getContext('2d');
+  if(ctx) ctx.clearRect(0,0,canvas.width,canvas.height);
+}
+
 export function mount(){
   document.querySelectorAll('header nav [data-nav]').forEach(b=>{ b.addEventListener('click', ()=>State.go(+b.dataset.nav)); });
   const file = document.getElementById('e1-file'); file.addEventListener('change', onPickImage);
@@ -46,8 +230,6 @@ function hydrateProjectView(){
   setValue('p-color', params.color);
   setValue('p-board', params.board);
 
-  const slider=document.getElementById('e4-step');
-  const counter=document.getElementById('e4-count');
   const renderCanvas=document.getElementById('render-canvas');
   const viewerCanvas=document.getElementById('viewer-canvas');
 
@@ -67,17 +249,11 @@ function hydrateProjectView(){
     }
   }
 
-  const maxStep = steps.length>0 ? steps.length-1 : 0;
-  if(slider){
-    slider.max = maxStep;
-    slider.value = maxStep;
-  }
-  if(counter){
-    counter.textContent = steps.length + ' steps';
-  }
+  const hasDrawable = steps.length>0 && hasPins && p.size;
+  setViewerSteps(steps, pinCount);
 
-  if(steps.length>0 && hasPins && p.size){
-    drawViewer(maxStep);
+  if(hasDrawable){
+    goToStep(viewerState.current);
   } else if(viewerCanvas){
     const vctx=viewerCanvas.getContext('2d');
     if(vctx) vctx.clearRect(0,0,viewerCanvas.width, viewerCanvas.height);
@@ -287,17 +463,8 @@ function bindGenerate(){
         previewState.size = data.size;
         previewState.lastCount = data.steps.length;
         previewState.renderedStep = data.steps.length-1;
-        const sliderEl=document.getElementById('e4-step');
-        const counterEl=document.getElementById('e4-count');
-        const maxStep=Math.max(data.steps.length-1,0);
-        if(sliderEl){
-          sliderEl.max=maxStep;
-          sliderEl.value=maxStep;
-          if(data.steps.length>0) drawViewer(maxStep);
-        }
-        if(counterEl){
-          counterEl.textContent=data.steps.length + ' steps';
-        }
+        setViewerSteps(data.steps, p.params.pins);
+        goToStep(viewerState.current);
       } else if(type==='status'){
         if(data.state==='paused'){
           stat.textContent='Paused';
@@ -337,27 +504,85 @@ function bindGenerate(){
 }
 
 function bindViewer(){
-  const slider=document.getElementById('e4-step'); const canvas=document.getElementById('viewer-canvas');
+  const canvas=document.getElementById('viewer-canvas');
   const expPNG=document.getElementById('exp-png'); const expSVGb=document.getElementById('exp-svg'); const expCSVb=document.getElementById('exp-csv'); const expJSONb=document.getElementById('exp-json');
 
-  slider.addEventListener('input', ()=>drawViewer(+slider.value));
-  expPNG.addEventListener('click', ()=>{ const url=canvas.toDataURL('image/png'); downloadURL(url,'string-art.png'); });
-  expSVGb.addEventListener('click', ()=>{ const p=State.get().project; const steps=p.stepsCSV.split(',').map(s=>+s); const blob=exportSVG(p.size, buildPins(p.size, p.params.pins), steps, p.params); const url=URL.createObjectURL(blob); downloadURL(url,'string-art.svg'); URL.revokeObjectURL(url); });
-  expCSVb.addEventListener('click', ()=>{ const p=State.get().project; const steps=p.stepsCSV.split(',').map(s=>+s); const blob=exportCSV(steps, buildPins(p.size, p.params.pins)); const url=URL.createObjectURL(blob); downloadURL(url,'string-art.csv'); URL.revokeObjectURL(url); });
-  expJSONb.addEventListener('click', ()=>{ const p=State.get().project; const preset={brand:'Hammer Design', pins:p.params.pins, strings:p.params.strings, minDist:p.params.minDist, fade:p.params.fade, widthPx:p.params.widthPx, alpha:p.params.alpha, color:p.params.color, board:p.params.board, seed:p.params.seed, locale:(navigator.language||'en').slice(0,2), watermark:'© 2025 Hammer Design'}; const blob=new Blob([JSON.stringify(preset,null,2)], {type:'application/json'}); const url=URL.createObjectURL(blob); downloadURL(url,'preset.json'); URL.revokeObjectURL(url); });
+  const firstBtn=document.getElementById('e4-first');
+  const lastBtn=document.getElementById('e4-last');
+  const prevBtn=document.getElementById('e4-prev');
+  const nextBtn=document.getElementById('e4-next');
+  const playBtn=document.getElementById('e4-play');
+  const speedBtn=document.getElementById('e4-speed');
+  const voiceBtn=document.getElementById('e4-voice');
+  const jumpBtn=document.getElementById('e4-step-jump');
+
+  if(firstBtn){ firstBtn.addEventListener('click', ()=>{ stopPlayback(); goToStep(0); }); }
+  if(lastBtn){ lastBtn.addEventListener('click', ()=>{ stopPlayback(); goToStep(viewerState.max); }); }
+  if(prevBtn){ prevBtn.addEventListener('click', ()=>{ stopPlayback(); goToStep(viewerState.current-1); }); }
+  if(nextBtn){ nextBtn.addEventListener('click', ()=>{ stopPlayback(); goToStep(viewerState.current+1); }); }
+  if(playBtn){ playBtn.addEventListener('click', togglePlayback); }
+  if(speedBtn){ speedBtn.addEventListener('click', cycleSpeed); }
+  if(voiceBtn){ voiceBtn.addEventListener('click', toggleVoice); }
+  if(jumpBtn){
+    jumpBtn.addEventListener('click', ()=>{
+      if(viewerState.steps.length===0) return;
+      const total = viewerState.steps.length;
+      const input = prompt('Go to step (1-' + total + ')', String(viewerState.current+1));
+      if(input===null) return;
+      const num = Number.parseInt(input, 10);
+      if(Number.isFinite(num)){
+        const clamped = Math.max(1, Math.min(num, total));
+        stopPlayback();
+        goToStep(clamped-1);
+      }
+    });
+  }
+
+  if(expPNG){ expPNG.addEventListener('click', ()=>{ if(!canvas) return; const url=canvas.toDataURL('image/png'); downloadURL(url,'string-art.png'); }); }
+  if(expSVGb){ expSVGb.addEventListener('click', ()=>{ const p=State.get().project; if(!p) return; const steps=(p.stepsCSV||'').split(',').map(s=>+s).filter(n=>Number.isFinite(n)); const blob=exportSVG(p.size, buildPins(p.size, p.params.pins), steps, p.params); const url=URL.createObjectURL(blob); downloadURL(url,'string-art.svg'); URL.revokeObjectURL(url); }); }
+  if(expCSVb){ expCSVb.addEventListener('click', ()=>{ const p=State.get().project; if(!p) return; const steps=(p.stepsCSV||'').split(',').map(s=>+s).filter(n=>Number.isFinite(n)); const blob=exportCSV(steps, buildPins(p.size, p.params.pins)); const url=URL.createObjectURL(blob); downloadURL(url,'string-art.csv'); URL.revokeObjectURL(url); }); }
+  if(expJSONb){ expJSONb.addEventListener('click', ()=>{ const p=State.get().project; if(!p) return; const preset={brand:'Hammer Design', pins:p.params.pins, strings:p.params.strings, minDist:p.params.minDist, fade:p.params.fade, widthPx:p.params.widthPx, alpha:p.params.alpha, color:p.params.color, board:p.params.board, seed:p.params.seed, locale:(navigator.language||'en').slice(0,2), watermark:'© 2025 Hammer Design'}; const blob=new Blob([JSON.stringify(preset,null,2)], {type:'application/json'}); const url=URL.createObjectURL(blob); downloadURL(url,'preset.json'); URL.revokeObjectURL(url); }); }
+
+  updateProgressUI();
+  updateControlsState();
+  updateSpeedLabel();
+  updateVoiceButton();
+  updatePlayButton();
 
   function downloadURL(url,name){ const a=document.createElement('a'); a.href=url; a.download=name; a.click(); }
 }
 
 function drawViewer(k){
-  const p=State.get().project; if(!p) return;
-  const stepsCSV=(p.stepsCSV||'').trim();
-  if(!stepsCSV) return;
-  const canvas=document.getElementById('viewer-canvas'); if(!canvas) return;
-  const allSteps=stepsCSV.split(',').map(s=>Number(s)).filter(n=>Number.isFinite(n));
-  if(allSteps.length===0) return;
-  const pinCount=Number(p.params?.pins);
-  if(!Number.isFinite(pinCount) || pinCount<=0 || !p.size) return;
+  const p=State.get().project;
+  const canvas=document.getElementById('viewer-canvas');
+  if(!p || !canvas){
+    clearViewer();
+    return;
+  }
+
+  let allSteps=viewerState.steps;
+  if(!allSteps || allSteps.length===0){
+    const stepsCSV=(p.stepsCSV||'').trim();
+    allSteps=stepsCSV ? stepsCSV.split(',').map(s=>Number(s)).filter(n=>Number.isFinite(n)) : [];
+    if(allSteps.length>0){
+      viewerState.steps = allSteps;
+      viewerState.max = allSteps.length-1;
+      viewerState.current = Math.min(k, viewerState.max);
+    }
+  }
+
+  if(!allSteps || allSteps.length===0){
+    clearViewer();
+    return;
+  }
+
+  const pinCountCandidate = Number.isFinite(viewerState.pinCount) && viewerState.pinCount>0 ? viewerState.pinCount : Number(p.params?.pins);
+  const pinCount=Number(pinCountCandidate);
+  if(!Number.isFinite(pinCount) || pinCount<=0 || !p.size){
+    clearViewer();
+    return;
+  }
+
   const steps=allSteps.slice(0, Math.min(k+1, allSteps.length));
   const pins=buildPins(p.size, pinCount);
   renderPinsAndStrings(canvas, p.size, pins, steps, p.params);
