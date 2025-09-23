@@ -670,19 +670,6 @@ function bindViewer(){
     });
   }
 
-  if(ui.progressBar){
-    ui.progressBar.addEventListener('pointerdown', e=>{
-      if(viewerState.steps.length===0) return;
-      const rect = ui.progressBar.getBoundingClientRect();
-      const ratio = rect.width>0 ? (e.clientX - rect.left) / rect.width : 0;
-      const clampedRatio = Math.max(0, Math.min(1, ratio));
-      const targetIndex = Math.round(clampedRatio * (viewerState.steps.length - 1));
-      stopAutoPlay();
-      setStep(targetIndex, {announce:true});
-      e.preventDefault();
-    });
-  }
-
   if(ui.voiceButton && !viewerState.isVoiceSupported){
     if(!ui.voiceInfo){
       const info = document.createElement('span');
