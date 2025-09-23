@@ -447,7 +447,11 @@ function updateSpeedButton(){
   if(!speedButton) return;
   const ms = viewerState.autoPlayDelayMs || AUTO_PLAY_SPEEDS[0];
   const label = formatSpeedLabel(ms);
-  speedButton.textContent = 'Speed ' + label;
+  const valueEl = speedButton.querySelector('.speed-value');
+  if(valueEl){
+    valueEl.textContent = label;
+  }
+  speedButton.setAttribute('aria-label', `Playback speed ${label}`);
   updateSpeedMenuSelection();
 }
 
