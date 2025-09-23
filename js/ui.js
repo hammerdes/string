@@ -19,7 +19,10 @@ const viewerState = {
   isAutoPlaying: false,
   isVoiceOn: false,
   isVoiceSupported: typeof window !== 'undefined' && 'speechSynthesis' in window && typeof SpeechSynthesisUtterance !== 'undefined',
-  ui: {}
+  speedMenuOpen: false,
+  speedMenuOutsideHandler: null,
+  speedMenuKeyHandler: null,
+  ui: {},
 };
 
 function resetViewer(){
@@ -30,6 +33,7 @@ function resetViewer(){
   viewerState.autoPlayDelayMs = AUTO_PLAY_SPEEDS[DEFAULT_SPEED_INDEX];
   viewerState.isVoiceOn = false;
   clearViewer();
+  closeSpeedMenu({ focusButton: false });
   updateProgressIndicators();
   updateTransportState();
   updatePlayButton();
@@ -84,14 +88,225 @@ function scheduleNextStep(){
   }, delay);
 }
 
-function cycleAutoPlaySpeed(){
-  const currentIndex = AUTO_PLAY_SPEEDS.indexOf(viewerState.autoPlayDelayMs);
-  const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % AUTO_PLAY_SPEEDS.length : DEFAULT_SPEED_INDEX;
-  viewerState.autoPlayDelayMs = AUTO_PLAY_SPEEDS[nextIndex];
+function formatSpeedLabel(ms){
+  const secs = ms / 1000;
+  if(secs >= 1){
+    const label = Number.isInteger(secs) ? secs.toFixed(0) : secs.toFixed(1);
+    return label + 's';
+  }
+  return ms + 'ms';
+}
+
+function selectAutoPlaySpeed(ms){
+  if(!Number.isFinite(ms)) return;
+  viewerState.autoPlayDelayMs = ms;
   updateSpeedButton();
   if(viewerState.isAutoPlaying){
     scheduleNextStep();
   }
+  closeSpeedMenu();
+}
+
+function updateSpeedMenuSelection(){
+  const { speedOptions } = viewerState.ui;
+  if(!Array.isArray(speedOptions)) return;
+  speedOptions.forEach(option=>{
+    const speed = Number(option.dataset.speed);
+    const isActive = speed === viewerState.autoPlayDelayMs;
+    option.classList.toggle('is-active', isActive);
+    option.setAttribute('aria-checked', isActive ? 'true' : 'false');
+  });
+}
+
+function setSpeedOptionsTabIndex(value){
+  const { speedOptions } = viewerState.ui;
+  if(!Array.isArray(speedOptions)) return;
+  speedOptions.forEach(option=>{
+    option.tabIndex = value;
+  });
+}
+
+function focusCurrentSpeedOption(){
+  const { speedOptions } = viewerState.ui;
+  if(!Array.isArray(speedOptions) || speedOptions.length === 0) return;
+  const current = speedOptions.find(option=>Number(option.dataset.speed) === viewerState.autoPlayDelayMs);
+  const target = current || speedOptions[0];
+  if(target) target.focus();
+}
+
+function openSpeedMenu(){
+  const { speedButton, speedMenu } = viewerState.ui;
+  if(!speedButton || !speedMenu) return;
+  if(viewerState.speedMenuOpen || speedButton.disabled) return;
+  updateSpeedMenuSelection();
+  setSpeedOptionsTabIndex(0);
+  speedMenu.classList.add('is-open');
+  speedMenu.setAttribute('aria-hidden', 'false');
+  speedButton.classList.add('is-open');
+  speedButton.setAttribute('aria-expanded', 'true');
+  viewerState.speedMenuOpen = true;
+  viewerState.speedMenuOutsideHandler = handleSpeedMenuOutsidePointer;
+  viewerState.speedMenuKeyHandler = handleSpeedMenuKeyDown;
+  document.addEventListener('pointerdown', viewerState.speedMenuOutsideHandler);
+  document.addEventListener('keydown', viewerState.speedMenuKeyHandler);
+}
+
+function closeSpeedMenu({ focusButton = true } = {}){
+  const { speedButton, speedMenu } = viewerState.ui;
+  if(!speedButton || !speedMenu) return;
+  viewerState.speedMenuOpen = false;
+  speedMenu.classList.remove('is-open');
+  speedMenu.setAttribute('aria-hidden', 'true');
+  speedButton.classList.remove('is-open');
+  speedButton.setAttribute('aria-expanded', 'false');
+  setSpeedOptionsTabIndex(-1);
+  if(viewerState.speedMenuOutsideHandler){
+    document.removeEventListener('pointerdown', viewerState.speedMenuOutsideHandler);
+    viewerState.speedMenuOutsideHandler = null;
+  }
+  if(viewerState.speedMenuKeyHandler){
+    document.removeEventListener('keydown', viewerState.speedMenuKeyHandler);
+    viewerState.speedMenuKeyHandler = null;
+  }
+  if(focusButton && !speedButton.disabled){
+    speedButton.focus();
+  }
+}
+
+function handleSpeedButtonClick(event){
+  event.preventDefault();
+  if(viewerState.speedMenuOpen){
+    closeSpeedMenu({ focusButton: false });
+  } else {
+    openSpeedMenu();
+  }
+}
+
+function handleSpeedButtonKeyDown(event){
+  const key = event.key;
+  if(key === 'ArrowDown' || key === 'ArrowUp' || key === 'Enter' || key === ' ' || key === 'Spacebar'){
+    event.preventDefault();
+    if(!viewerState.speedMenuOpen){
+      openSpeedMenu();
+      focusCurrentSpeedOption();
+    }
+  } else if(key === 'Escape' && viewerState.speedMenuOpen){
+    event.preventDefault();
+    closeSpeedMenu();
+  }
+}
+
+function handleSpeedOptionKeyDown(event){
+  const options = viewerState.ui.speedOptions || [];
+  const count = options.length;
+  if(count === 0) return;
+  const current = event.currentTarget;
+  const index = options.indexOf(current);
+  switch(event.key){
+    case 'ArrowDown':
+    case 'ArrowRight': {
+      event.preventDefault();
+      const next = options[(index + 1) % count];
+      if(next) next.focus();
+      break;
+    }
+    case 'ArrowUp':
+    case 'ArrowLeft': {
+      event.preventDefault();
+      const prev = options[(index - 1 + count) % count];
+      if(prev) prev.focus();
+      break;
+    }
+    case 'Home': {
+      event.preventDefault();
+      options[0]?.focus();
+      break;
+    }
+    case 'End': {
+      event.preventDefault();
+      options[count - 1]?.focus();
+      break;
+    }
+    case 'Escape': {
+      event.preventDefault();
+      closeSpeedMenu();
+      break;
+    }
+  }
+}
+
+function handleSpeedMenuOutsidePointer(event){
+  const { speedButton, speedMenu } = viewerState.ui;
+  if(!viewerState.speedMenuOpen || !speedMenu) return;
+  const target = event.target;
+  if(speedMenu.contains(target) || (speedButton && speedButton.contains(target))){
+    return;
+  }
+  closeSpeedMenu({ focusButton: false });
+}
+
+function handleSpeedMenuKeyDown(event){
+  if(event.key === 'Escape' && viewerState.speedMenuOpen){
+    event.preventDefault();
+    closeSpeedMenu();
+  }
+}
+
+function handleSpeedMenuFocusOut(event){
+  if(!viewerState.speedMenuOpen) return;
+  const { speedMenu, speedButton } = viewerState.ui;
+  if(!speedMenu) return;
+  const next = event.relatedTarget;
+  if(next && (speedMenu.contains(next) || (speedButton && speedButton.contains(next)))){
+    return;
+  }
+  closeSpeedMenu({ focusButton: false });
+}
+
+function setupSpeedMenu(){
+  const ui = viewerState.ui;
+  const button = ui.speedButton;
+  const menu = document.getElementById('e4-speed-menu');
+  ui.speedMenu = menu;
+  if(!button || !menu) return;
+  if(menu.dataset.bound === 'true'){
+    ui.speedOptions = Array.from(menu.querySelectorAll('.e4-speed-option'));
+    setSpeedOptionsTabIndex(-1);
+    updateSpeedMenuSelection();
+    button.setAttribute('aria-expanded', viewerState.speedMenuOpen ? 'true' : 'false');
+    menu.setAttribute('aria-hidden', viewerState.speedMenuOpen ? 'false' : 'true');
+    return;
+  }
+  menu.innerHTML = '';
+  menu.dataset.bound = 'true';
+  menu.setAttribute('role', 'menu');
+  menu.setAttribute('aria-hidden', 'true');
+  const options = AUTO_PLAY_SPEEDS.map(ms=>{
+    const li = document.createElement('li');
+    li.setAttribute('role', 'none');
+    const option = document.createElement('button');
+    option.type = 'button';
+    option.className = 'e4-speed-option';
+    option.dataset.speed = String(ms);
+    option.textContent = formatSpeedLabel(ms);
+    option.setAttribute('role', 'menuitemradio');
+    option.setAttribute('aria-checked', 'false');
+    option.tabIndex = -1;
+    option.addEventListener('click', ()=>selectAutoPlaySpeed(ms));
+    option.addEventListener('keydown', handleSpeedOptionKeyDown);
+    li.appendChild(option);
+    menu.appendChild(li);
+    return option;
+  });
+  ui.speedOptions = options;
+  setSpeedOptionsTabIndex(-1);
+  updateSpeedMenuSelection();
+  button.addEventListener('click', handleSpeedButtonClick);
+  button.addEventListener('keydown', handleSpeedButtonKeyDown);
+  menu.addEventListener('focusout', handleSpeedMenuFocusOut);
+  button.setAttribute('aria-haspopup', 'menu');
+  button.setAttribute('aria-expanded', 'false');
+  menu.classList.remove('is-open');
 }
 
 function toggleVoice(){
@@ -194,6 +409,9 @@ function setDisabled(el, disabled){
   el.disabled = !!disabled;
   if(disabled){
     el.setAttribute('aria-disabled', 'true');
+    if(el === viewerState.ui.speedButton){
+      closeSpeedMenu({ focusButton: false });
+    }
   } else {
     el.removeAttribute('aria-disabled');
   }
@@ -203,9 +421,9 @@ function updateSpeedButton(){
   const { speedButton } = viewerState.ui;
   if(!speedButton) return;
   const ms = viewerState.autoPlayDelayMs || AUTO_PLAY_SPEEDS[0];
-  const secs = ms / 1000;
-  const label = secs >= 1 ? ((Number.isInteger(secs) ? secs.toFixed(0) : secs.toFixed(1)) + 's') : (ms + 'ms');
+  const label = formatSpeedLabel(ms);
   speedButton.textContent = 'Speed ' + label;
+  updateSpeedMenuSelection();
 }
 
 function updatePlayButton(){
@@ -613,6 +831,7 @@ function bindViewer(){
   ui.nextButton = document.getElementById('e4-next');
   ui.lastButton = document.getElementById('e4-last');
   ui.speedButton = document.getElementById('e4-speed');
+  ui.speedMenu = document.getElementById('e4-speed-menu');
   ui.voiceButton = document.getElementById('e4-voice');
   ui.jumpButton = document.getElementById('e4-step-jump');
   ui.progressFill = document.getElementById('e4-progress-fill');
@@ -621,6 +840,8 @@ function bindViewer(){
   ui.prevPinCell = document.getElementById('e4-prev-pin');
   ui.currentPinCell = document.getElementById('e4-current-pin');
   ui.nextPinCell = document.getElementById('e4-next-pin');
+
+  setupSpeedMenu();
 
   const canvas = ui.canvas;
   const expPNG = document.getElementById('exp-png');
@@ -653,7 +874,6 @@ function bindViewer(){
     });
   }
   if(ui.playButton){ ui.playButton.addEventListener('click', toggleAutoPlay); }
-  if(ui.speedButton){ ui.speedButton.addEventListener('click', cycleAutoPlaySpeed); }
   if(ui.voiceButton){ ui.voiceButton.addEventListener('click', toggleVoice); }
   if(ui.jumpButton){
     ui.jumpButton.addEventListener('click', ()=>{

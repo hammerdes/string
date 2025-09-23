@@ -117,7 +117,10 @@
       </div>
 
       <div class="e4-controls">
-        <button id="e4-speed" class="e4-control-speed e4-speed">Speed 3s</button>
+        <div class="e4-speed-control">
+          <button id="e4-speed" class="e4-control-speed e4-speed" type="button" aria-haspopup="menu" aria-expanded="false">Speed 3s</button>
+          <ul id="e4-speed-menu" class="e4-speed-menu" role="menu" aria-hidden="true"></ul>
+        </div>
         <div class="e4-control-group e4-transport">
           <button id="e4-prev">Prev</button>
           <button id="e4-play" aria-pressed="false">Play</button>
