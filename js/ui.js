@@ -464,10 +464,10 @@ function updatePlayButton(){
   const playStateEls = playButton.querySelectorAll('[data-state="play"]');
   const pauseStateEls = playButton.querySelectorAll('[data-state="pause"]');
   playStateEls.forEach(el=>{
-    el.hidden = isPlaying;
+    el.toggleAttribute('hidden', isPlaying);
   });
   pauseStateEls.forEach(el=>{
-    el.hidden = !isPlaying;
+    el.toggleAttribute('hidden', !isPlaying);
   });
 }
 
