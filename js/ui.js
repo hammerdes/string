@@ -373,11 +373,20 @@ function setStep(index, {announce = true} = {}){
     return;
   }
   const clamped = Math.max(0, Math.min(index, total - 1));
+  const previousIndex = viewerState.stepIndex;
   viewerState.stepIndex = clamped;
   drawViewer(clamped);
   updateProgressIndicators();
   updateTransportState();
   updateVoiceButton();
+  if(clamped !== previousIndex){
+    const project = State.get().project;
+    if(projectIsSaved(project)){
+      project.lastViewedStep = clamped;
+      project.updatedAt = Date.now();
+      State.persistMeta();
+    }
+  }
   if(viewerState.isAutoPlaying){
     scheduleNextStep();
   }
@@ -585,7 +594,7 @@ function clearViewer(){
   if(ctx) ctx.clearRect(0,0,canvas.width,canvas.height);
 }
 
-function applyViewerSteps(steps, pinCount, {announce = false} = {}){
+function applyViewerSteps(steps, pinCount, {announce = false, initialIndex} = {}){
   const normalizedSteps = Array.isArray(steps) ? steps.filter(n=>Number.isFinite(n)) : [];
   const normalizedPinCount = Number.isFinite(pinCount) ? pinCount : 0;
   stopAutoPlay();
@@ -595,7 +604,17 @@ function applyViewerSteps(steps, pinCount, {announce = false} = {}){
   updateSpeedButton();
   updatePlayButton();
   const shouldAnnounce = announce && normalizedSteps.length>0 && normalizedPinCount>0;
-  setStep(0, { announce: shouldAnnounce });
+  let targetIndex = initialIndex;
+  if(!Number.isFinite(targetIndex)){
+    const project = State.get().project;
+    if(projectIsSaved(project)){
+      targetIndex = project.lastViewedStep ?? 0;
+    } else {
+      targetIndex = 0;
+    }
+  }
+  targetIndex = Math.max(0, Math.floor(targetIndex));
+  setStep(targetIndex, { announce: shouldAnnounce && targetIndex <= 0 });
   updateProjectSaveUI();
 }
 
@@ -689,7 +708,8 @@ function hydrateProjectView(){
   }
 
   const hasDrawable = steps.length>0 && hasPins && p.size;
-  applyViewerSteps(hasDrawable ? steps : [], hasPins ? pinCount : 0, {announce:false});
+  const resumeIndex = projectIsSaved(p) ? (p.lastViewedStep ?? 0) : 0;
+  applyViewerSteps(hasDrawable ? steps : [], hasPins ? pinCount : 0, {announce:false, initialIndex: resumeIndex});
 
   if(!hasDrawable && viewerCanvas){
     const vctx=viewerCanvas.getContext('2d');
@@ -894,14 +914,23 @@ function bindGenerate(){
         }
       } else if(type==='result'){
         const p=State.get().project;
-        p.stepsCSV=data.steps.join(','); p.stepCount=data.steps.length; p.updatedAt=Date.now(); State.persistMeta(); syncProjectMetaUI();
+        const newStepCount = data.steps.length;
+        p.stepsCSV=data.steps.join(','); p.stepCount=newStepCount; p.updatedAt=Date.now();
+        if(!Number.isFinite(p.lastViewedStep) || p.lastViewedStep < 0){
+          p.lastViewedStep = 0;
+        }
+        const maxValidIndex = Math.max(0, newStepCount - 1);
+        if(p.lastViewedStep > maxValidIndex){
+          p.lastViewedStep = maxValidIndex;
+        }
+        State.persistMeta(); syncProjectMetaUI();
         bar.style.width='100%'; stat.textContent='Done in ' + data.durationMs + ' ms';
         renderPinsAndStrings(rc, data.size, data.pins, data.steps, p.params);
         previewState.pins = data.pins;
         previewState.size = data.size;
         previewState.lastCount = data.steps.length;
         previewState.renderedStep = data.steps.length-1;
-        applyViewerSteps(data.steps, p.params.pins, {announce:false});
+        applyViewerSteps(data.steps, p.params.pins, {announce:false, initialIndex: p.lastViewedStep ?? 0});
       } else if(type==='status'){
         if(data.state==='paused'){
           stat.textContent='Paused';
