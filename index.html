@@ -136,7 +136,13 @@
       </div>
 
       <div class="e4-progress">
-        <button id="e4-first">First</button>
+        <button id="e4-first" class="icon-btn">
+          <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+            <path d="M7 5v14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+            <path d="M17 19 9 12l8-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          </svg>
+          <span class="sr-only">First step</span>
+        </button>
         <div class="e4-progress-center">
           <span id="e4-progress-label">0 / 0</span>
           <div class="e4-progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0">
@@ -144,8 +150,19 @@
           </div>
         </div>
         <div class="e4-progress-actions">
-          <button id="e4-last">Last</button>
-          <button id="e4-step-jump">Adıma git</button>
+          <button id="e4-last" class="icon-btn">
+            <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+              <path d="M17 5v14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+              <path d="m7 5 8 7-8 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+            </svg>
+            <span class="sr-only">Last step</span>
+          </button>
+          <button id="e4-step-jump" class="icon-btn">
+            <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+              <path d="M5 9h14M5 15h14M9 5v14M15 5v14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+            </svg>
+            <span class="sr-only">Jump to step</span>
+          </button>
         </div>
       </div>
 
