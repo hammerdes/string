@@ -76,7 +76,9 @@ canvas{display:block;width:100%;height:auto;border-radius:12px;background:#111}
 #screen-4 .e4-speed,#screen-4 .e4-voice{white-space:nowrap}
 #screen-4 .e4-speed.is-open{border-color:color-mix(in srgb, var(--accent) 55%, transparent);background:color-mix(in srgb, var(--accent) 22%, #0f1320 78%);box-shadow:0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent)}
 #screen-4 .e4-transport{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap}
-#screen-4 .e4-transport button{min-width:88px}
+#screen-4 .e4-transport .icon-btn{width:44px;height:44px;min-width:44px;padding:0}
+#screen-4 .e4-transport .icon-btn svg{width:24px;height:24px}
+#screen-4 #e4-play [data-state][hidden],#screen-4 #e4-play .sr-only[data-state][hidden]{display:none}
 #screen-4 .e4-speed.is-on{border-color:color-mix(in srgb, var(--accent) 55%, transparent);background:color-mix(in srgb, var(--accent) 24%, #0f1320 76%);box-shadow:0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent)}
 #screen-4 .e4-voice.is-on{border-color:color-mix(in srgb, var(--brand) 55%, transparent);background:color-mix(in srgb, var(--brand) 22%, #0f1320 78%);box-shadow:0 0 0 1px color-mix(in srgb, var(--brand) 35%, transparent)}
 
@@ -98,5 +100,5 @@ canvas{display:block;width:100%;height:auto;border-radius:12px;background:#111}
   #screen-4 .e4-controls>.e4-speed-control{flex:1 1 160px}
   .e4-speed-menu{left:0;right:auto;width:100%;max-width:100%}
   #screen-4 .e4-transport{width:100%}
-  #screen-4 .e4-transport button{flex:1 1 100px}
+  #screen-4 .e4-transport .icon-btn{flex:0 0 44px}
 }
