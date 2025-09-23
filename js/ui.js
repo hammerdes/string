@@ -350,19 +350,20 @@ function setStep(index, {announce = true} = {}){
 
 function updateProgressIndicators(){
   const { progressLabel, progressFill, progressBar, prevPinCell, currentPinCell, nextPinCell } = viewerState.ui;
-  const total = viewerState.steps.length;
-  const current = total > 0 ? viewerState.stepIndex + 1 : 0;
+  const totalSteps = Math.max(viewerState.steps.length - 1, 0);
+  const currentStep = Math.min(viewerState.stepIndex, totalSteps);
   if(progressLabel){
-    progressLabel.textContent = `Step ${current} / ${total}`;
+    progressLabel.textContent = `Step ${currentStep} / ${totalSteps}`;
   }
   if(progressFill){
-    const pct = total > 0 ? ((viewerState.stepIndex + 1) / total) * 100 : 0;
+    let pct = totalSteps > 0 ? (currentStep / totalSteps) * 100 : 0;
+    pct = Number.isFinite(pct) ? Math.min(Math.max(pct, 0), 100) : 0;
     progressFill.style.width = pct.toFixed(1) + '%';
   }
   if(progressBar){
     progressBar.setAttribute('aria-valuemin', '0');
-    progressBar.setAttribute('aria-valuemax', String(total));
-    progressBar.setAttribute('aria-valuenow', String(current));
+    progressBar.setAttribute('aria-valuemax', String(totalSteps));
+    progressBar.setAttribute('aria-valuenow', String(currentStep));
   }
   updateStepCell(prevPinCell, viewerState.steps[viewerState.stepIndex - 1]);
   updateStepCell(currentPinCell, viewerState.steps[viewerState.stepIndex]);
