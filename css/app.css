@@ -62,11 +62,23 @@ canvas{display:block;width:100%;height:auto;border-radius:12px;background:#111}
 #screen-4 .e4-cell [data-value][hidden],#screen-4 .e4-cell [data-placeholder][hidden]{display:none}
 #screen-4 .e4-controls{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
 #screen-4 .e4-controls>button{flex:0 0 auto}
+#screen-4 .e4-controls>.e4-speed-control{flex:0 0 auto}
+#screen-4 .e4-speed-control{position:relative;display:flex;flex-direction:column;align-items:stretch;min-width:0}
+#screen-4 .e4-speed-control .e4-speed{width:100%}
 #screen-4 .e4-speed,#screen-4 .e4-voice{white-space:nowrap}
+#screen-4 .e4-speed.is-open{border-color:color-mix(in srgb, var(--accent) 55%, transparent);background:color-mix(in srgb, var(--accent) 22%, #0f1320 78%);box-shadow:0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent)}
 #screen-4 .e4-transport{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap}
 #screen-4 .e4-transport button{min-width:88px}
 #screen-4 .e4-speed.is-on{border-color:color-mix(in srgb, var(--accent) 55%, transparent);background:color-mix(in srgb, var(--accent) 24%, #0f1320 76%);box-shadow:0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent)}
 #screen-4 .e4-voice.is-on{border-color:color-mix(in srgb, var(--brand) 55%, transparent);background:color-mix(in srgb, var(--brand) 22%, #0f1320 78%);box-shadow:0 0 0 1px color-mix(in srgb, var(--brand) 35%, transparent)}
+
+.e4-speed-menu{list-style:none;margin:6px 0 0;padding:6px;position:absolute;top:calc(100% + 6px);right:0;left:auto;display:flex;flex-direction:column;gap:4px;min-width:156px;max-width:min(220px,calc(100vw - 32px));max-height:280px;overflow-y:auto;background:color-mix(in srgb, #0f1320 95%, transparent);border:1px solid color-mix(in srgb, var(--accent) 30%, var(--ring) 70%);border-radius:12px;box-shadow:0 14px 34px rgba(0,0,0,.4);opacity:0;visibility:hidden;transform:translateY(-6px) scale(.98);pointer-events:none;transition:opacity .16s ease, transform .16s ease, visibility .16s linear;z-index:15}
+.e4-speed-menu.is-open{opacity:1;visibility:visible;transform:translateY(0) scale(1);pointer-events:auto}
+.e4-speed-menu li{margin:0;padding:0;list-style:none}
+.e4-speed-option{width:100%;border:1px solid transparent;background:color-mix(in srgb, #131a2a 85%, transparent);color:var(--text);padding:8px 10px;border-radius:9px;text-align:left;font-weight:600;font-size:13px;line-height:1.4;cursor:pointer;transition:background-color .18s ease, border-color .18s ease, color .18s ease}
+.e4-speed-option:hover,.e4-speed-option:focus-visible{background:color-mix(in srgb, var(--accent) 20%, #131a2a 80%);border-color:color-mix(in srgb, var(--accent) 35%, transparent);outline:none}
+.e4-speed-option.is-active{background:color-mix(in srgb, var(--accent) 32%, #131a2a 68%);border-color:color-mix(in srgb, var(--accent) 45%, transparent)}
+.e4-speed-option[aria-checked="true"]::after{content:"✓";float:right;font-weight:700;color:color-mix(in srgb, var(--text) 90%, var(--accent) 10%)}
 
 @media(max-width:720px){
   #screen-4 .e4-progress{grid-template-columns:1fr;gap:12px}
@@ -75,6 +87,8 @@ canvas{display:block;width:100%;height:auto;border-radius:12px;background:#111}
   #screen-4 .e4-progress-center{text-align:center}
   #screen-4 .e4-controls{justify-content:center}
   #screen-4 .e4-controls>button{flex:1 1 160px}
+  #screen-4 .e4-controls>.e4-speed-control{flex:1 1 160px}
+  .e4-speed-menu{left:0;right:auto;width:100%;max-width:100%}
   #screen-4 .e4-transport{width:100%}
   #screen-4 .e4-transport button{flex:1 1 100px}
 }
