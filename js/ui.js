@@ -654,7 +654,12 @@ function refreshProjectList(){
   State.listProjects().filter(p=>projectIsSaved(p)).forEach(p=>{
     const li=document.createElement('li');
     li.innerHTML=`<span>${p.name}</span><span class="tiny">${new Date(p.updatedAt).toLocaleString()}</span>`;
-    li.addEventListener('click', ()=>{ State.setProject(p); hydrateProjectView(); refreshProjectList(); State.go(3); });
+    li.addEventListener('click', ()=>{
+      State.setProject(p);
+      hydrateProjectView();
+      State.go(4);
+      refreshProjectList();
+    });
     ul.appendChild(li);
   });
 }
