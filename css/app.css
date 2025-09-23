@@ -82,6 +82,13 @@ canvas{display:block;width:100%;height:auto;border-radius:12px;background:#111}
 #screen-4 .e4-transport{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap}
 #screen-4 .e4-transport .icon-btn{width:44px;height:44px;min-width:44px;padding:0}
 #screen-4 .e4-transport .icon-btn svg{width:24px;height:24px}
+#screen-4 .e4-voice{width:44px;height:44px;min-width:44px;padding:0;display:inline-flex;align-items:center;justify-content:center;gap:0;line-height:0;border-radius:12px;transition:transform .18s ease, box-shadow .18s ease}
+#screen-4 .e4-voice:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+#screen-4 .e4-voice .voice-icon{display:none;align-items:center;justify-content:center}
+#screen-4 .e4-voice .voice-icon.is-active{display:flex}
+#screen-4 .e4-voice .voice-icon[hidden]{display:none}
+#screen-4 .e4-voice .voice-icon svg{width:24px;height:24px;display:block;transition:transform .18s ease}
+#screen-4 .e4-voice:hover .voice-icon.is-active svg,#screen-4 .e4-voice:focus-visible .voice-icon.is-active svg{transform:translateY(-1px)}
 #screen-4 #e4-play [data-state][hidden],#screen-4 #e4-play .sr-only[data-state][hidden]{display:none}
 #screen-4 .e4-speed.is-on{border-color:color-mix(in srgb, var(--accent) 55%, transparent);background:color-mix(in srgb, var(--accent) 24%, #0f1320 76%);box-shadow:0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent)}
 #screen-4 .e4-voice.is-on{border-color:color-mix(in srgb, var(--brand) 55%, transparent);background:color-mix(in srgb, var(--brand) 22%, #0f1320 78%);box-shadow:0 0 0 1px color-mix(in srgb, var(--brand) 35%, transparent)}

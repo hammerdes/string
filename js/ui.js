@@ -474,11 +474,35 @@ function updatePlayButton(){
 function updateVoiceButton(){
   const { voiceButton, voiceInfo } = viewerState.ui;
   if(!voiceButton) return;
+  const icons = {
+    off: voiceButton.querySelector('[data-state="off"]'),
+    on: voiceButton.querySelector('[data-state="on"]'),
+    unavailable: voiceButton.querySelector('[data-state="unavailable"]')
+  };
+  const labelEl = voiceButton.querySelector('[data-voice-label]');
+  const setActiveState = state => {
+    Object.entries(icons).forEach(([key, icon])=>{
+      if(!icon) return;
+      const isActive = key === state;
+      icon.classList.toggle('is-active', isActive);
+      if(isActive){
+        icon.removeAttribute('hidden');
+      } else {
+        icon.setAttribute('hidden', '');
+      }
+    });
+  };
   if(!viewerState.isVoiceSupported){
-    voiceButton.textContent = 'Voice Unavailable';
     voiceButton.disabled = true;
     voiceButton.setAttribute('aria-pressed', 'false');
     voiceButton.setAttribute('aria-disabled', 'true');
+    voiceButton.classList.remove('is-on');
+    setActiveState('unavailable');
+    const label = 'Voice unavailable';
+    voiceButton.setAttribute('aria-label', label);
+    if(labelEl){
+      labelEl.textContent = label;
+    }
     if(voiceInfo){
       voiceInfo.hidden = false;
     }
@@ -491,8 +515,15 @@ function updateVoiceButton(){
   } else {
     voiceButton.removeAttribute('aria-disabled');
   }
-  voiceButton.textContent = viewerState.isVoiceOn ? 'Voice On' : 'Voice Off';
-  voiceButton.setAttribute('aria-pressed', viewerState.isVoiceOn ? 'true' : 'false');
+  const isOn = !!viewerState.isVoiceOn && viewerState.isVoiceSupported;
+  voiceButton.setAttribute('aria-pressed', isOn ? 'true' : 'false');
+  voiceButton.classList.toggle('is-on', isOn);
+  setActiveState(isOn ? 'on' : 'off');
+  const label = isOn ? 'Voice on' : 'Voice off';
+  voiceButton.setAttribute('aria-label', label);
+  if(labelEl){
+    labelEl.textContent = label;
+  }
   if(voiceInfo){
     voiceInfo.hidden = true;
   }
