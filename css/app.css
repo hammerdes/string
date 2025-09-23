@@ -2,8 +2,6 @@
 *{box-sizing:border-box}
 html,body{height:100%}
 body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 system-ui,Segoe UI,Roboto,Arial}
-.app-header{position:sticky;top:0;z-index:5;display:flex;align-items:center;justify-content:center;padding:18px 16px;border-bottom:1px solid var(--ring);backdrop-filter:blur(8px);text-align:center}
-.app-header h1{margin:0;font-size:16px;color:var(--brand)}
 .screen{display:none;padding:14px;max-width:980px;margin:0 auto;padding-bottom:120px}
 .screen.active{display:block}
 .panel{background:var(--panel);border:1px solid var(--ring);border-radius:12px;padding:12px;margin-bottom:12px;box-shadow:0 6px 24px rgba(0,0,0,.25)}
