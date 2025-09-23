@@ -74,6 +74,10 @@ canvas{display:block;width:100%;height:auto;border-radius:12px;background:#111}
 #screen-4 .e4-speed-control{position:relative;display:flex;flex-direction:column;align-items:stretch;min-width:0}
 #screen-4 .e4-speed-control .e4-speed{width:100%}
 #screen-4 .e4-speed,#screen-4 .e4-voice{white-space:nowrap}
+#screen-4 .e4-speed{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px 12px}
+#screen-4 .e4-speed .speed-icon{width:18px;height:18px;flex:0 0 auto;display:block}
+#screen-4 .e4-speed .speed-value{display:inline-flex;align-items:center;justify-content:center;font-variant-numeric:tabular-nums;letter-spacing:.01em}
+#screen-4 .e4-speed .speed-caret{font-size:12px;line-height:1;flex:0 0 auto}
 #screen-4 .e4-speed.is-open{border-color:color-mix(in srgb, var(--accent) 55%, transparent);background:color-mix(in srgb, var(--accent) 22%, #0f1320 78%);box-shadow:0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent)}
 #screen-4 .e4-transport{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap}
 #screen-4 .e4-transport .icon-btn{width:44px;height:44px;min-width:44px;padding:0}
