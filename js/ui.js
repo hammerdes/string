@@ -365,9 +365,27 @@ function updateProgressIndicators(){
     progressBar.setAttribute('aria-valuemax', String(totalSteps));
     progressBar.setAttribute('aria-valuenow', String(currentStep));
   }
-  updateStepCell(prevPinCell, viewerState.steps[viewerState.stepIndex - 1]);
-  updateStepCell(currentPinCell, viewerState.steps[viewerState.stepIndex]);
-  updateStepCell(nextPinCell, viewerState.steps[viewerState.stepIndex + 1]);
+  const prevValue = viewerState.steps[viewerState.stepIndex - 1];
+  const currentValue = viewerState.steps[viewerState.stepIndex];
+  const nextValue = viewerState.steps[viewerState.stepIndex + 1];
+
+  updateStepCell(prevPinCell, prevValue);
+  updateStepCell(currentPinCell, currentValue);
+  updateStepCell(nextPinCell, nextValue);
+
+  if(prevPinCell){
+    prevPinCell.classList.toggle('is-active', false);
+    prevPinCell.classList.toggle('is-empty', !Number.isFinite(prevValue));
+  }
+  if(currentPinCell){
+    const hasCurrentStep = viewerState.stepIndex >= 0 && viewerState.stepIndex < viewerState.steps.length;
+    currentPinCell.classList.toggle('is-active', hasCurrentStep);
+    currentPinCell.classList.toggle('is-empty', !Number.isFinite(currentValue));
+  }
+  if(nextPinCell){
+    nextPinCell.classList.toggle('is-active', false);
+    nextPinCell.classList.toggle('is-empty', !Number.isFinite(nextValue));
+  }
 }
 
 function updateStepCell(cell, value){
@@ -377,9 +395,11 @@ function updateStepCell(cell, value){
   if(Number.isFinite(value)){
     if(valueEl){ valueEl.hidden = false; valueEl.textContent = value; }
     if(placeholderEl){ placeholderEl.hidden = true; }
+    cell.classList.remove('is-empty');
   } else {
     if(valueEl){ valueEl.hidden = true; valueEl.textContent = ''; }
     if(placeholderEl){ placeholderEl.hidden = false; }
+    cell.classList.add('is-empty');
   }
 }
 
