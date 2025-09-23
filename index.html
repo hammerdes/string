@@ -79,10 +79,58 @@
     <div class="panel">
       <div class="e4-board-wrap">
         <div class="e4-toolbar">
-          <button id="exp-png" class="good">Export PNG</button>
-          <button id="exp-svg">Export SVG</button>
-          <button id="exp-csv">Export CSV</button>
-          <button id="exp-json">Export JSON</button>
+          <button id="exp-png" class="good icon-btn">
+            <svg aria-hidden="true" viewBox="0 0 32 32" focusable="false">
+              <g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M16 5v11"/>
+                <path d="m12.5 12.5 3.5 3.5 3.5-3.5"/>
+                <path d="M7 17v6a3 3 0 0 0 3 3h12a3 3 0 0 0 3-3v-6"/>
+                <path d="M11 23h10"/>
+              </g>
+              <rect x="5" y="5" width="14" height="9" rx="2.5" fill="currentColor" opacity="0.12" stroke="currentColor" stroke-width="1.5"/>
+              <text x="12" y="9.5" text-anchor="middle" dominant-baseline="middle" font-size="4.4" font-weight="700" font-family="inherit" fill="currentColor">PNG</text>
+            </svg>
+            <span class="sr-only">Export PNG</span>
+          </button>
+          <button id="exp-svg" class="icon-btn">
+            <svg aria-hidden="true" viewBox="0 0 32 32" focusable="false">
+              <g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M16 5v11"/>
+                <path d="m12.5 12.5 3.5 3.5 3.5-3.5"/>
+                <path d="M7 17v6a3 3 0 0 0 3 3h12a3 3 0 0 0 3-3v-6"/>
+                <path d="M11 23h10"/>
+              </g>
+              <rect x="5" y="5" width="14" height="9" rx="2.5" fill="currentColor" opacity="0.12" stroke="currentColor" stroke-width="1.5"/>
+              <text x="12" y="9.5" text-anchor="middle" dominant-baseline="middle" font-size="4.4" font-weight="700" font-family="inherit" fill="currentColor">SVG</text>
+            </svg>
+            <span class="sr-only">Export SVG</span>
+          </button>
+          <button id="exp-csv" class="icon-btn">
+            <svg aria-hidden="true" viewBox="0 0 32 32" focusable="false">
+              <g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M16 5v11"/>
+                <path d="m12.5 12.5 3.5 3.5 3.5-3.5"/>
+                <path d="M7 17v6a3 3 0 0 0 3 3h12a3 3 0 0 0 3-3v-6"/>
+                <path d="M11 23h10"/>
+              </g>
+              <rect x="5" y="5" width="14" height="9" rx="2.5" fill="currentColor" opacity="0.12" stroke="currentColor" stroke-width="1.5"/>
+              <text x="12" y="9.5" text-anchor="middle" dominant-baseline="middle" font-size="4.4" font-weight="700" font-family="inherit" fill="currentColor">CSV</text>
+            </svg>
+            <span class="sr-only">Export CSV</span>
+          </button>
+          <button id="exp-json" class="icon-btn">
+            <svg aria-hidden="true" viewBox="0 0 32 32" focusable="false">
+              <g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M16 5v11"/>
+                <path d="m12.5 12.5 3.5 3.5 3.5-3.5"/>
+                <path d="M7 17v6a3 3 0 0 0 3 3h12a3 3 0 0 0 3-3v-6"/>
+                <path d="M11 23h10"/>
+              </g>
+              <rect x="5" y="5" width="14" height="9" rx="2.5" fill="currentColor" opacity="0.12" stroke="currentColor" stroke-width="1.5"/>
+              <text x="12" y="9.5" text-anchor="middle" dominant-baseline="middle" font-size="3.6" font-weight="700" font-family="inherit" fill="currentColor">JSON</text>
+            </svg>
+            <span class="sr-only">Export JSON</span>
+          </button>
         </div>
         <div class="canvas-wrap"><canvas id="viewer-canvas" width="1440" height="1440" aria-label="Viewer"></canvas></div>
       </div>
