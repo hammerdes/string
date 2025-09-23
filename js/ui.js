@@ -10,6 +10,10 @@ let removeNavigateListener = null;
 
 let crop = { img:null, scale:1, tx:0, ty:0, rot:0, down:false, lx:0, ly:0, displaySize:0 };
 
+let viewerResizeObserver = null;
+let viewerLastObservedWidth = 0;
+let viewerPendingDraw = false;
+
 const viewerState = {
   stepIndex: 0,
   steps: [],
@@ -537,6 +541,14 @@ function setActiveNav(screenId){
       btn.removeAttribute('aria-current');
     }
   });
+  if(target === 4){
+    const triggerDraw = ()=>drawViewer(viewerState.stepIndex);
+    if(typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function'){
+      window.requestAnimationFrame(triggerDraw);
+    } else {
+      setTimeout(triggerDraw, 0);
+    }
+  }
 }
 
 function refreshProjectList(){
@@ -870,6 +882,32 @@ function bindViewer(){
   const expCSVb = document.getElementById('exp-csv');
   const expJSONb = document.getElementById('exp-json');
 
+  if(viewerResizeObserver){
+    viewerResizeObserver.disconnect();
+    viewerResizeObserver = null;
+  }
+  viewerLastObservedWidth = 0;
+  if(canvas && typeof ResizeObserver !== 'undefined'){
+    const target = canvas.parentElement || canvas;
+    if(target){
+      viewerResizeObserver = new ResizeObserver(entries=>{
+        for(const entry of entries){
+          const rect = entry.contentRect || {};
+          const width = Math.round(rect.width || entry.target.clientWidth || 0);
+          if(width <= 0){
+            continue;
+          }
+          const shouldDraw = viewerPendingDraw || width !== viewerLastObservedWidth;
+          viewerLastObservedWidth = width;
+          if(shouldDraw){
+            drawViewer(viewerState.stepIndex);
+          }
+        }
+      });
+      viewerResizeObserver.observe(target);
+    }
+  }
+
   if(ui.firstButton){
     ui.firstButton.addEventListener('click', ()=>{
       stopAutoPlay();
@@ -946,6 +984,7 @@ function drawViewer(stepIndex){
   const canvas = viewerState.ui.canvas || document.getElementById('viewer-canvas');
   if(!p || !canvas){
     clearViewer();
+    viewerPendingDraw = false;
     return;
   }
 
@@ -955,8 +994,25 @@ function drawViewer(stepIndex){
 
   if(!Array.isArray(steps) || steps.length===0 || !Number.isFinite(pinCount) || pinCount<=0 || !p.size){
     clearViewer();
+    viewerPendingDraw = false;
     return;
   }
+
+  const parent = canvas.parentElement;
+  if(!parent){
+    clearViewer();
+    viewerPendingDraw = false;
+    return;
+  }
+
+  const cssSize = parent.clientWidth || 0;
+  if(!(cssSize > 0)){
+    viewerPendingDraw = true;
+    return;
+  }
+
+  viewerPendingDraw = false;
+  viewerLastObservedWidth = Math.round(cssSize);
 
   const clamped = Math.max(0, Math.min(stepIndex, steps.length-1));
   const subset = steps.slice(0, clamped+1);
