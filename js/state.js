@@ -13,6 +13,8 @@ export function onNavigate(fn){ if(typeof fn==='function') navigateListeners.add
 function normalizeProject(proj){
   if(!proj || typeof proj !== 'object') return null;
   const normalized = { ...proj };
+  const step = Number.isFinite(normalized.lastViewedStep) ? Math.max(0, Math.floor(normalized.lastViewedStep)) : 0;
+  normalized.lastViewedStep = step;
   if(normalized.isSaved === false){
     return normalized;
   }
@@ -25,7 +27,7 @@ export function newProjectFromImage(file){
   const proj = { id, name: file.name || 'Untitled', createdAt: Date.now(), updatedAt: Date.now(),
     rasterBlobId: null, size: 0, circle: {cx:0,cy:0,r:0}, view: {scale:1, tx:0, ty:0},
     params: { pins: 240, strings: 3000, minDist: 15, fade: 50, alpha: 180, widthPx: 0.8, pinSize: 4, color: '#000000', board:'white', seed:1337 },
-    stepsCSV:'', stepCount:0, isSaved:false };
+    stepsCSV:'', stepCount:0, lastViewedStep:0, isSaved:false };
   state.project = proj; persistMeta(); return proj;
 }
 export function setProject(proj){
