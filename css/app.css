@@ -13,6 +13,10 @@ button{appearance:none;border:1px solid var(--ring);background:#0f1320;color:var
 button.primary{background:color-mix(in srgb, var(--brand) 22%, #0f1320 78%);border-color:#1e78a8}
 button.danger{background:color-mix(in srgb, #ef4444 22%, #0f1320 78%);border-color:#7a2a2a}
 button.good{background:color-mix(in srgb, #22c55e 22%, #0f1320 78%);border-color:#2e7d60}
+.icon-btn{width:44px;height:44px;padding:0;display:inline-flex;align-items:center;justify-content:center;gap:0;line-height:0;border-radius:12px;transition:transform .18s ease, box-shadow .18s ease}
+.icon-btn svg{width:24px;height:24px;display:block;transition:transform .18s ease}
+.icon-btn:hover svg,.icon-btn:focus-visible svg{transform:translateY(-1px)}
+.icon-btn:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
 input,select{width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--ring);background:#0f1320;color:var(--text)}
 .canvas-wrap{display:flex;justify-content:center;align-items:center;min-height:50vh}
 canvas{display:block;width:100%;height:auto;border-radius:12px;background:#111}
