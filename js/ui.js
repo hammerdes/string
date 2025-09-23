@@ -29,6 +29,40 @@ const viewerState = {
   ui: {},
 };
 
+function projectIsSaved(proj){
+  return !!(proj && proj.isSaved !== false);
+}
+
+function updateProjectSaveUI(){
+  const proj = State.get().project;
+  const hasProject = !!proj;
+  const isSaved = projectIsSaved(proj);
+  const { saveButton, exportButtons } = viewerState.ui;
+
+  if(saveButton){
+    saveButton.disabled = !hasProject;
+    saveButton.setAttribute('aria-disabled', saveButton.disabled ? 'true' : 'false');
+    saveButton.classList.toggle('is-unsaved', hasProject && !isSaved);
+  }
+
+  if(Array.isArray(exportButtons)){
+    const shouldDisableExports = !hasProject || !isSaved || viewerState.steps.length === 0;
+    exportButtons.forEach(btn=>{
+      if(!btn) return;
+      btn.disabled = shouldDisableExports;
+      btn.setAttribute('aria-disabled', shouldDisableExports ? 'true' : 'false');
+    });
+  }
+}
+
+function syncProjectMetaUI(){
+  const proj = State.get().project;
+  if(projectIsSaved(proj)){
+    refreshProjectList();
+  }
+  updateProjectSaveUI();
+}
+
 function resetViewer(){
   stopAutoPlay({ updateButton: false });
   viewerState.stepIndex = 0;
@@ -562,6 +596,7 @@ function applyViewerSteps(steps, pinCount, {announce = false} = {}){
   updatePlayButton();
   const shouldAnnounce = announce && normalizedSteps.length>0 && normalizedPinCount>0;
   setStep(0, { announce: shouldAnnounce });
+  updateProjectSaveUI();
 }
 
 export function mount(){
@@ -597,17 +632,22 @@ function setActiveNav(screenId){
 
 function refreshProjectList(){
   const ul = document.getElementById('project-list'); ul.innerHTML = '';
-  State.listProjects().forEach(p=>{
+  State.listProjects().filter(p=>projectIsSaved(p)).forEach(p=>{
     const li=document.createElement('li');
     li.innerHTML=`<span>${p.name}</span><span class="tiny">${new Date(p.updatedAt).toLocaleString()}</span>`;
-    li.addEventListener('click', ()=>{ State.setProject(p); hydrateProjectView(); State.go(3); });
+    li.addEventListener('click', ()=>{ State.setProject(p); hydrateProjectView(); refreshProjectList(); State.go(3); });
     ul.appendChild(li);
   });
 }
 
 function hydrateProjectView(){
   const p = State.get().project;
-  if(!p) return;
+  if(!p){
+    updateProjectSaveUI();
+    return;
+  }
+
+  updateProjectSaveUI();
 
   const params = p.params || {};
   const setValue = (id, value)=>{
@@ -660,6 +700,7 @@ function hydrateProjectView(){
 async function onPickImage(e){
   const f = e.target.files && e.target.files[0]; if(!f) return;
   State.newProjectFromImage(f);
+  updateProjectSaveUI();
   const url = URL.createObjectURL(f); const img = new Image();
   img.onload = ()=>{ crop.img=img; State.go(2); drawCrop(); }; img.src = url;
 }
@@ -742,7 +783,7 @@ function bindCrop(){
     proj.size=SIZE; proj.circle={cx:SIZE/2, cy:SIZE/2, r:(SIZE/2)-BOARD_MARGIN};
     proj.view={scale:crop.scale, tx:exportTx, ty:exportTy, rot:crop.rot};
     proj.rasterBlobId = proj.id + '.raster'; proj.updatedAt = Date.now();
-    await State.saveRasterBlob(proj.rasterBlobId, blob); State.persistMeta(); State.go(3);
+    await State.saveRasterBlob(proj.rasterBlobId, blob); State.persistMeta(); syncProjectMetaUI(); State.go(3);
   });
 }
 
@@ -853,7 +894,7 @@ function bindGenerate(){
         }
       } else if(type==='result'){
         const p=State.get().project;
-        p.stepsCSV=data.steps.join(','); p.stepCount=data.steps.length; p.updatedAt=Date.now(); State.persistMeta();
+        p.stepsCSV=data.steps.join(','); p.stepCount=data.steps.length; p.updatedAt=Date.now(); State.persistMeta(); syncProjectMetaUI();
         bar.style.width='100%'; stat.textContent='Done in ' + data.durationMs + ' ms';
         renderPinsAndStrings(rc, data.size, data.pins, data.steps, p.params);
         previewState.pins = data.pins;
@@ -902,6 +943,7 @@ function bindGenerate(){
 function bindViewer(){
   const ui = viewerState.ui;
   ui.canvas = document.getElementById('viewer-canvas');
+  ui.saveButton = document.getElementById('save-project');
   ui.firstButton = document.getElementById('e4-first');
   ui.prevButton = document.getElementById('e4-prev');
   ui.playButton = document.getElementById('e4-play');
@@ -925,6 +967,24 @@ function bindViewer(){
   const expSVGb = document.getElementById('exp-svg');
   const expCSVb = document.getElementById('exp-csv');
   const expJSONb = document.getElementById('exp-json');
+  ui.exportButtons = [expPNG, expSVGb, expCSVb, expJSONb].filter(Boolean);
+
+  if(ui.saveButton){
+    ui.saveButton.addEventListener('click', ()=>{
+      const proj = State.get().project;
+      if(!proj) return;
+      const defaultName = (proj.name || '').trim() || 'Untitled';
+      const input = prompt('Save project as', defaultName);
+      if(input === null) return;
+      const trimmed = input.trim();
+      const newName = trimmed || defaultName;
+      proj.name = newName;
+      proj.isSaved = true;
+      proj.updatedAt = Date.now();
+      State.persistMeta();
+      syncProjectMetaUI();
+    });
+  }
 
   if(viewerResizeObserver){
     viewerResizeObserver.disconnect();
@@ -1021,6 +1081,8 @@ function bindViewer(){
     updateVoiceButton();
     updatePlayButton();
   }
+
+  updateProjectSaveUI();
 }
 
 function drawViewer(stepIndex){
