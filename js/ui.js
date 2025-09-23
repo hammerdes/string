@@ -454,8 +454,17 @@ function updateSpeedButton(){
 function updatePlayButton(){
   const { playButton } = viewerState.ui;
   if(!playButton) return;
-  playButton.textContent = viewerState.isAutoPlaying ? 'Pause' : 'Play';
-  playButton.setAttribute('aria-pressed', viewerState.isAutoPlaying ? 'true' : 'false');
+  const isPlaying = viewerState.isAutoPlaying;
+  playButton.setAttribute('aria-pressed', isPlaying ? 'true' : 'false');
+  playButton.setAttribute('aria-label', isPlaying ? 'Pause' : 'Play');
+  const playStateEls = playButton.querySelectorAll('[data-state="play"]');
+  const pauseStateEls = playButton.querySelectorAll('[data-state="pause"]');
+  playStateEls.forEach(el=>{
+    el.hidden = isPlaying;
+  });
+  pauseStateEls.forEach(el=>{
+    el.hidden = !isPlaying;
+  });
 }
 
 function updateVoiceButton(){

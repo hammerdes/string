@@ -187,9 +187,31 @@
           <ul id="e4-speed-menu" class="e4-speed-menu" role="menu" aria-hidden="true"></ul>
         </div>
         <div class="e4-control-group e4-transport">
-          <button id="e4-prev">Prev</button>
-          <button id="e4-play" aria-pressed="false">Play</button>
-          <button id="e4-next">Next</button>
+          <button id="e4-prev" class="icon-btn" type="button">
+            <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+              <path d="m14 6-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span class="sr-only">Previous step</span>
+          </button>
+          <button id="e4-play" class="icon-btn" type="button" aria-pressed="false">
+            <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false" data-state="play">
+              <path d="m10 7 8 5-8 5z" fill="currentColor"/>
+            </svg>
+            <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false" data-state="pause" hidden>
+              <g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                <path d="M10 7v10"/>
+                <path d="M14 7v10"/>
+              </g>
+            </svg>
+            <span class="sr-only" data-state="play">Play</span>
+            <span class="sr-only" data-state="pause" hidden>Pause</span>
+          </button>
+          <button id="e4-next" class="icon-btn" type="button">
+            <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+              <path d="m10 6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span class="sr-only">Next step</span>
+          </button>
         </div>
         <button id="e4-voice" class="e4-control-voice e4-voice" aria-pressed="false">Voice Off</button>
       </div>
