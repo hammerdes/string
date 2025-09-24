@@ -28,6 +28,57 @@ canvas{display:block;width:100%;height:auto;border-radius:12px;background:#111}
 .hint{color:var(--muted);font-size:12px}
 .tiny{color:var(--muted);font-size:12px}
 
+/* E1 */
+#screen-1{min-height:100vh;padding:32px 16px 140px}
+#screen-1.active{display:flex;align-items:center;justify-content:center}
+#screen-1 .e1-stage{width:100%;max-width:520px;position:relative;display:flex;align-items:center;justify-content:center}
+#screen-1 .e1-home{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;text-align:center;padding:28px 24px;background:color-mix(in srgb, var(--panel) 82%, transparent);border:1px solid color-mix(in srgb, var(--ring) 65%, transparent);border-radius:20px;box-shadow:0 22px 46px rgba(0,0,0,.45);min-width:min(100%,420px)}
+#screen-1 .e1-home.is-hidden{visibility:hidden;pointer-events:none}
+#screen-1 .e1-home-heading{display:flex;flex-direction:column;gap:8px}
+#screen-1 .e1-title{margin:0;font-size:28px;font-weight:700;letter-spacing:.02em}
+#screen-1 .e1-subtitle{margin:0;color:var(--muted);font-size:14px}
+#screen-1 .e1-actions{display:flex;flex-direction:column;gap:12px;width:100%}
+#screen-1 .e1-actions button{width:100%;padding:16px 18px;border-radius:14px;font-size:16px}
+#screen-1 .e1-actions button:not(.primary){background:color-mix(in srgb, #101522 92%, transparent);border:1px solid color-mix(in srgb, var(--ring) 70%, transparent);color:var(--text)}
+#screen-1 .e1-hint{color:var(--muted);font-size:12px}
+#screen-1 .e1-projects{position:absolute;inset:0;display:flex;flex-direction:column;background:color-mix(in srgb, var(--panel) 90%, transparent);border:1px solid color-mix(in srgb, var(--ring) 65%, transparent);border-radius:20px;box-shadow:0 24px 54px rgba(0,0,0,.48);padding:24px}
+#screen-1 .e1-projects[hidden]{display:none}
+#screen-1 .e1-projects-header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:12px}
+#screen-1 .e1-projects-title{margin:0;font-size:22px;font-weight:700}
+#screen-1 .e1-back-btn{display:inline-flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:12px;padding:0;background:color-mix(in srgb, #101522 88%, transparent);border:1px solid color-mix(in srgb, var(--ring) 70%, transparent);color:var(--text);transition:color .18s ease, border-color .18s ease, background-color .18s ease}
+#screen-1 .e1-back-btn svg{width:22px;height:22px;transform:scaleX(-1)}
+#screen-1 .e1-back-btn:hover,#screen-1 .e1-back-btn:focus-visible{color:var(--brand);border-color:color-mix(in srgb, var(--brand) 45%, transparent);outline:none}
+#screen-1 .e1-projects-body{flex:1;min-height:0;overflow-y:auto;padding-right:4px;margin-right:-4px}
+#screen-1 .project-cards{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px}
+#screen-1 .project-card{display:flex;align-items:center;gap:12px;border-radius:16px;background:color-mix(in srgb, #101522 94%, transparent);border:1px solid color-mix(in srgb, var(--ring) 65%, transparent);padding:12px 14px;box-shadow:0 10px 24px rgba(0,0,0,.35)}
+#screen-1 .project-card-main{flex:1;display:flex;align-items:center;gap:12px;border:none;background:none;color:inherit;padding:0;text-align:left;cursor:pointer}
+#screen-1 .project-card-main:focus-visible{outline:2px solid var(--brand);outline-offset:4px;border-radius:14px}
+#screen-1 .project-card-thumb{width:64px;height:64px;border-radius:50%;overflow:hidden;background:color-mix(in srgb, #0f1320 92%, transparent);display:flex;align-items:center;justify-content:center;flex-shrink:0;position:relative}
+#screen-1 .project-card-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+#screen-1 .project-card-info{display:flex;flex-direction:column;gap:4px;min-width:0}
+#screen-1 .project-card-name{font-weight:600;font-size:16px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#screen-1 .project-card-meta{font-size:13px;color:var(--muted)}
+#screen-1 .project-card-menu{position:relative;display:flex;align-items:center;justify-content:center}
+#screen-1 .project-card-menu-btn{width:40px;height:40px;border-radius:12px;padding:0;display:inline-flex;align-items:center;justify-content:center;background:color-mix(in srgb, #101522 88%, transparent);border:1px solid transparent;color:var(--muted);cursor:pointer;transition:color .18s ease, background-color .18s ease, border-color .18s ease}
+#screen-1 .project-card-menu-btn svg{width:20px;height:20px}
+#screen-1 .project-card-menu.is-open .project-card-menu-btn,#screen-1 .project-card-menu-btn:hover,#screen-1 .project-card-menu-btn:focus-visible{color:var(--text);border-color:color-mix(in srgb, var(--brand) 45%, transparent);outline:none}
+#screen-1 .project-card-menu-list{position:absolute;top:calc(100% + 6px);right:0;min-width:184px;display:flex;flex-direction:column;gap:4px;padding:6px;border-radius:14px;background:color-mix(in srgb, #0f1320 96%, transparent);border:1px solid color-mix(in srgb, var(--ring) 75%, transparent);box-shadow:0 20px 46px rgba(0,0,0,.5);opacity:0;visibility:hidden;transform:translateY(-6px);transition:opacity .16s ease, transform .16s ease, visibility .16s ease;z-index:30}
+#screen-1 .project-card-menu.is-open .project-card-menu-list{opacity:1;visibility:visible;transform:translateY(0)}
+#screen-1 .project-card-menu-list button{width:100%;text-align:left;padding:10px 12px;border-radius:10px;border:1px solid transparent;background:color-mix(in srgb, #131a2a 90%, transparent);color:var(--text);font-weight:600;cursor:pointer}
+#screen-1 .project-card-menu-list button:hover,#screen-1 .project-card-menu-list button:focus-visible{background:color-mix(in srgb, var(--brand) 25%, #131a2a 75%);border-color:color-mix(in srgb, var(--brand) 45%, transparent);outline:none}
+#screen-1 .project-card-menu-list button.is-danger{color:color-mix(in srgb, #fda4af 80%, var(--text) 20%)}
+#screen-1 .project-card-menu-list button.is-danger:hover,#screen-1 .project-card-menu-list button.is-danger:focus-visible{background:color-mix(in srgb, #7a2a2a 40%, #131a2a 60%);border-color:color-mix(in srgb, #ef4444 45%, transparent)}
+#screen-1 .project-list-empty{margin-top:40px;text-align:center;color:var(--muted);font-size:13px}
+
+@media(max-width:600px){
+  #screen-1{padding:24px 12px 130px}
+  #screen-1 .e1-home{padding:24px 20px}
+  #screen-1 .e1-projects{padding:20px 16px}
+  #screen-1 .project-card{flex-direction:column;align-items:flex-start}
+  #screen-1 .project-card-main{width:100%}
+  #screen-1 .project-card-menu{align-self:flex-end}
+}
+
 /* Sabit alt sekme çubuğu */
 .app-nav{position:fixed;bottom:0;left:0;right:0;z-index:10;display:flex;gap:8px;justify-content:space-around;padding:10px 12px calc(10px + env(safe-area-inset-bottom,0));background-color:color-mix(in srgb, var(--panel) 92%, transparent);backdrop-filter:blur(12px);border-top:1px solid var(--ring)}
 .app-nav button{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:10px 12px;border-radius:14px;background:color-mix(in srgb, #101522 92%, transparent);border:1px solid transparent;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:0.05em;font-weight:600;transition:color .2s ease, background-color .2s ease, border-color .2s ease}
