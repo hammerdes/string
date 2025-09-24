@@ -35,7 +35,3 @@ function withDB(mode, fn){
 }
 export async function idbPutBlob(key, blob){ return withDB('readwrite', s=>s.put(blob, key)); }
 export async function idbGetBlob(key){ return withDB('readonly', s=>new Promise((res,rej)=>{ const r = s.get(key); r.onsuccess=()=>res(r.result||null); r.onerror=()=>rej(r.error); })); }
-export async function idbDeleteBlob(key){
-  if(!key) return;
-  return withDB('readwrite', s=>s.delete(key));
-}

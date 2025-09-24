@@ -1,4 +1,4 @@
-import { idbPutBlob, idbGetBlob, idbDeleteBlob } from './utils.js';
+import { idbPutBlob, idbGetBlob } from './utils.js';
 const LS_KEY = 'sa.projects.v1';
 const state = { screen: 1, project: null };
 const navigateListeners = new Set();
@@ -22,24 +22,6 @@ function normalizeProject(proj){
   return normalized;
 }
 
-function readStoredProjects(){
-  const raw = localStorage.getItem(LS_KEY);
-  if(!raw) return [];
-  try{
-    const parsed = JSON.parse(raw);
-    if(!Array.isArray(parsed)) return [];
-    return parsed;
-  }catch(err){
-    console.error('Failed to parse stored projects', err);
-    return [];
-  }
-}
-
-function writeStoredProjects(list){
-  const normalized = list.map(normalizeProject).filter(Boolean);
-  localStorage.setItem(LS_KEY, JSON.stringify(normalized.slice(0,50)));
-}
-
 export function newProjectFromImage(file){
   const id = 'p_' + Date.now().toString(36);
   const proj = { id, name: file.name || 'Untitled', createdAt: Date.now(), updatedAt: Date.now(),
@@ -58,62 +40,26 @@ export function setProject(proj){
   persistMeta();
 }
 export function listProjects(){
-  return readStoredProjects().map(normalizeProject).filter(Boolean);
+  const raw = localStorage.getItem(LS_KEY);
+  if(!raw) return [];
+  try{
+    const parsed = JSON.parse(raw);
+    if(!Array.isArray(parsed)) return [];
+    return parsed.map(normalizeProject).filter(Boolean);
+  }catch(err){
+    console.error('Failed to parse stored projects', err);
+    return [];
+  }
 }
 export function persistMeta(){
   const current = state.project;
   const currentId = current?.id;
-  const stored = readStoredProjects().filter(p=>p?.id !== currentId);
+  const list = listProjects().filter(p=>p.id !== currentId);
   if(current && current.isSaved !== false){
-    stored.unshift(normalizeProject(current));
+    list.unshift(normalizeProject(current));
   }
-  writeStoredProjects(stored);
+  localStorage.setItem(LS_KEY, JSON.stringify(list.slice(0,50)));
 }
 export async function saveRasterBlob(id, blob){ await idbPutBlob(id, blob); }
 export async function loadRasterBlob(id){ return await idbGetBlob(id); }
 export function get(){ return state; }
-
-export function renameProject(id, name){
-  const trimmed = (name ?? '').trim();
-  if(!id || !trimmed) return null;
-  const stored = readStoredProjects();
-  let updated = null;
-  const next = stored.map(proj=>{
-    if(proj?.id === id){
-      const update = { ...proj, name: trimmed, updatedAt: Date.now() };
-      updated = update;
-      return update;
-    }
-    return proj;
-  });
-  if(!updated){
-    return null;
-  }
-  writeStoredProjects(next);
-  if(state.project?.id === id){
-    state.project.name = trimmed;
-    state.project.updatedAt = updated.updatedAt;
-  }
-  return normalizeProject(updated);
-}
-
-export async function deleteProject(id){
-  if(!id) return false;
-  const stored = readStoredProjects();
-  const index = stored.findIndex(proj=>proj?.id === id);
-  if(index < 0) return false;
-  const [removed] = stored.splice(index, 1);
-  writeStoredProjects(stored);
-  if(removed?.rasterBlobId){
-    try{
-      await idbDeleteBlob(removed.rasterBlobId);
-    }catch(err){
-      console.error('Failed to remove raster blob for project', err);
-    }
-  }
-  if(state.project?.id === id){
-    state.project = null;
-  }
-  persistMeta();
-  return true;
-}

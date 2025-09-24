@@ -10,35 +10,14 @@
 <body>
 <main id="app">
   <section id="screen-1" class="screen" role="region" aria-label="Home">
-    <div class="e1-stage">
-      <div id="e1-home" class="e1-home">
-        <div class="e1-home-heading">
-          <h1 class="e1-title">String Art Studio</h1>
-          <p class="e1-subtitle">Start a new project or pick up where you left off.</p>
-        </div>
-        <div class="e1-actions">
-          <button id="e1-start" class="primary" type="button">New project</button>
-          <button id="e1-open" type="button">Saved projects</button>
-        </div>
-        <div class="e1-hint">Images stay on this device.</div>
-      </div>
-
-      <div id="e1-projects" class="e1-projects" hidden>
-        <header class="e1-projects-header">
-          <h2 class="e1-projects-title">Saved projects</h2>
-          <button id="e1-back" class="e1-back-btn" type="button">
-            <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
-              <path d="m8 5 8 7-8 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-            <span class="sr-only">Back to home</span>
-          </button>
-        </header>
-        <div class="e1-projects-body">
-          <ul id="project-list" class="project-cards" aria-label="Saved projects"></ul>
-          <div id="project-list-empty" class="project-list-empty" hidden>No saved projects yet. Generate and save one from the viewer to see it here.</div>
-        </div>
-      </div>
-      <input id="e1-file" type="file" accept="image/*" hidden/>
+    <div class="panel">
+      <h2>New project</h2>
+      <input id="e1-file" type="file" accept="image/*"/>
+      <div class="hint">Pick an image to start.</div>
+    </div>
+    <div class="panel">
+      <h2>My projects</h2>
+      <ul id="project-list" class="list"></ul>
     </div>
   </section>
 
