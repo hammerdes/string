@@ -62,6 +62,7 @@ canvas{display:block;width:100%;height:auto;border-radius:12px;background:#111}
 #screen-1 .project-card-menu{position:relative;display:flex;align-items:center;justify-content:center}
 #screen-1 .project-card-menu-btn{width:40px;height:40px;border-radius:12px;padding:0;display:inline-flex;align-items:center;justify-content:center;background:color-mix(in srgb, #101522 82%, transparent);border:1px solid transparent;color:color-mix(in srgb, var(--text) 75%, var(--brand) 25%);cursor:pointer;transition:color .18s ease, background-color .18s ease, border-color .18s ease}
 #screen-1 .project-card-menu-btn svg{width:20px;height:20px}
+#screen-1 .project-card-menu-btn svg circle{fill:currentColor}
 #screen-1 .project-card-menu.is-open .project-card-menu-btn,#screen-1 .project-card-menu-btn:hover,#screen-1 .project-card-menu-btn:focus-visible{color:var(--text);border-color:color-mix(in srgb, var(--brand) 45%, transparent);outline:none}
 #screen-1 .project-card-menu-list{position:absolute;top:calc(100% + 6px);right:0;min-width:184px;display:flex;flex-direction:column;gap:4px;padding:6px;border-radius:14px;background:color-mix(in srgb, #0f1320 96%, transparent);border:1px solid color-mix(in srgb, var(--ring) 75%, transparent);box-shadow:0 20px 46px rgba(0,0,0,.5);opacity:0;visibility:hidden;transform:translateY(-6px);transition:opacity .16s ease, transform .16s ease, visibility .16s ease;z-index:30}
 #screen-1 .project-card-menu.is-open .project-card-menu-list{opacity:1;visibility:visible;transform:translateY(0)}
