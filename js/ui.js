@@ -3,10 +3,620 @@ import { setCanvasSize, BOARD_MARGIN } from './utils.js';
 import { renderPinsAndStrings, exportSVG, exportCSV } from './renderer.js';
 
 const EXPORT_SIZE = 1440;
+const AUTO_PLAY_SPEEDS = [1000, 2000, 3000, 5000, 10000, 15000, 30000];
+const DEFAULT_SPEED_INDEX = 2;
 let navButtons = [];
 let removeNavigateListener = null;
 
 let crop = { img:null, scale:1, tx:0, ty:0, rot:0, down:false, lx:0, ly:0, displaySize:0 };
+
+let viewerResizeObserver = null;
+let viewerLastObservedWidth = 0;
+let viewerPendingDraw = false;
+
+const viewerState = {
+  stepIndex: 0,
+  steps: [],
+  pinCount: 0,
+  autoPlayDelayMs: AUTO_PLAY_SPEEDS[DEFAULT_SPEED_INDEX],
+  autoPlayTimer: null,
+  isAutoPlaying: false,
+  isVoiceOn: false,
+  isVoiceSupported: typeof window !== 'undefined' && 'speechSynthesis' in window && typeof SpeechSynthesisUtterance !== 'undefined',
+  speedMenuOpen: false,
+  speedMenuOutsideHandler: null,
+  speedMenuKeyHandler: null,
+  ui: {},
+};
+
+function projectIsSaved(proj){
+  return !!(proj && proj.isSaved !== false);
+}
+
+function updateProjectSaveUI(){
+  const proj = State.get().project;
+  const hasProject = !!proj;
+  const isSaved = projectIsSaved(proj);
+  const { saveButton, exportButtons } = viewerState.ui;
+
+  if(saveButton){
+    saveButton.disabled = !hasProject;
+    saveButton.setAttribute('aria-disabled', saveButton.disabled ? 'true' : 'false');
+    saveButton.classList.toggle('is-unsaved', hasProject && !isSaved);
+  }
+
+  if(Array.isArray(exportButtons)){
+    const shouldDisableExports = !hasProject || !isSaved || viewerState.steps.length === 0;
+    exportButtons.forEach(btn=>{
+      if(!btn) return;
+      btn.disabled = shouldDisableExports;
+      btn.setAttribute('aria-disabled', shouldDisableExports ? 'true' : 'false');
+    });
+  }
+}
+
+function syncProjectMetaUI(){
+  const proj = State.get().project;
+  if(projectIsSaved(proj)){
+    refreshProjectList();
+  }
+  updateProjectSaveUI();
+}
+
+function resetViewer(){
+  stopAutoPlay({ updateButton: false });
+  viewerState.stepIndex = 0;
+  viewerState.steps = [];
+  viewerState.pinCount = 0;
+  viewerState.autoPlayDelayMs = AUTO_PLAY_SPEEDS[DEFAULT_SPEED_INDEX];
+  viewerState.isVoiceOn = false;
+  clearViewer();
+  closeSpeedMenu({ focusButton: false });
+  updateProgressIndicators();
+  updateTransportState();
+  updatePlayButton();
+  updateSpeedButton();
+  updateVoiceButton();
+}
+
+function stopAutoPlay({updateButton = true} = {}){
+  if(viewerState.autoPlayTimer){
+    clearTimeout(viewerState.autoPlayTimer);
+    viewerState.autoPlayTimer = null;
+  }
+  const wasPlaying = viewerState.isAutoPlaying;
+  viewerState.isAutoPlaying = false;
+  if(wasPlaying && updateButton){
+    updatePlayButton();
+  }
+}
+
+function toggleAutoPlay(){
+  if(viewerState.isAutoPlaying){
+    stopAutoPlay();
+    return;
+  }
+  if(viewerState.steps.length === 0) return;
+  if(viewerState.stepIndex >= viewerState.steps.length - 1){
+    setStep(0, { announce: false });
+  }
+  viewerState.isAutoPlaying = true;
+  updatePlayButton();
+  scheduleNextStep();
+}
+
+function scheduleNextStep(){
+  if(viewerState.autoPlayTimer){
+    clearTimeout(viewerState.autoPlayTimer);
+    viewerState.autoPlayTimer = null;
+  }
+  if(!viewerState.isAutoPlaying) return;
+  const total = viewerState.steps.length;
+  if(total === 0){
+    stopAutoPlay();
+    return;
+  }
+  if(viewerState.stepIndex >= total - 1){
+    stopAutoPlay();
+    return;
+  }
+  const delay = viewerState.autoPlayDelayMs || AUTO_PLAY_SPEEDS[0];
+  viewerState.autoPlayTimer = setTimeout(()=>{
+    setStep(viewerState.stepIndex + 1, { announce: true });
+  }, delay);
+}
+
+function formatSpeedLabel(ms){
+  const secs = ms / 1000;
+  if(secs >= 1){
+    const label = Number.isInteger(secs) ? secs.toFixed(0) : secs.toFixed(1);
+    return label + 's';
+  }
+  return ms + 'ms';
+}
+
+function selectAutoPlaySpeed(ms){
+  if(!Number.isFinite(ms)) return;
+  viewerState.autoPlayDelayMs = ms;
+  updateSpeedButton();
+  if(viewerState.isAutoPlaying){
+    scheduleNextStep();
+  }
+  closeSpeedMenu();
+}
+
+function updateSpeedMenuSelection(){
+  const { speedOptions } = viewerState.ui;
+  if(!Array.isArray(speedOptions)) return;
+  speedOptions.forEach(option=>{
+    const speed = Number(option.dataset.speed);
+    const isActive = speed === viewerState.autoPlayDelayMs;
+    option.classList.toggle('is-active', isActive);
+    option.setAttribute('aria-checked', isActive ? 'true' : 'false');
+  });
+}
+
+function setSpeedOptionsTabIndex(value){
+  const { speedOptions } = viewerState.ui;
+  if(!Array.isArray(speedOptions)) return;
+  speedOptions.forEach(option=>{
+    option.tabIndex = value;
+  });
+}
+
+function focusCurrentSpeedOption(){
+  const { speedOptions } = viewerState.ui;
+  if(!Array.isArray(speedOptions) || speedOptions.length === 0) return;
+  const current = speedOptions.find(option=>Number(option.dataset.speed) === viewerState.autoPlayDelayMs);
+  const target = current || speedOptions[0];
+  if(target) target.focus();
+}
+
+function openSpeedMenu(){
+  const { speedButton, speedMenu } = viewerState.ui;
+  if(!speedButton || !speedMenu) return;
+  if(viewerState.speedMenuOpen || speedButton.disabled) return;
+  updateSpeedMenuSelection();
+  setSpeedOptionsTabIndex(0);
+  speedMenu.classList.add('is-open');
+  speedMenu.setAttribute('aria-hidden', 'false');
+  speedButton.classList.add('is-open');
+  speedButton.setAttribute('aria-expanded', 'true');
+  viewerState.speedMenuOpen = true;
+  viewerState.speedMenuOutsideHandler = handleSpeedMenuOutsidePointer;
+  viewerState.speedMenuKeyHandler = handleSpeedMenuKeyDown;
+  document.addEventListener('pointerdown', viewerState.speedMenuOutsideHandler);
+  document.addEventListener('keydown', viewerState.speedMenuKeyHandler);
+}
+
+function closeSpeedMenu({ focusButton = true } = {}){
+  const { speedButton, speedMenu } = viewerState.ui;
+  if(!speedButton || !speedMenu) return;
+  viewerState.speedMenuOpen = false;
+  speedMenu.classList.remove('is-open');
+  speedMenu.setAttribute('aria-hidden', 'true');
+  speedButton.classList.remove('is-open');
+  speedButton.setAttribute('aria-expanded', 'false');
+  setSpeedOptionsTabIndex(-1);
+  if(viewerState.speedMenuOutsideHandler){
+    document.removeEventListener('pointerdown', viewerState.speedMenuOutsideHandler);
+    viewerState.speedMenuOutsideHandler = null;
+  }
+  if(viewerState.speedMenuKeyHandler){
+    document.removeEventListener('keydown', viewerState.speedMenuKeyHandler);
+    viewerState.speedMenuKeyHandler = null;
+  }
+  if(focusButton && !speedButton.disabled){
+    speedButton.focus();
+  }
+}
+
+function handleSpeedButtonClick(event){
+  event.preventDefault();
+  if(viewerState.speedMenuOpen){
+    closeSpeedMenu({ focusButton: false });
+  } else {
+    openSpeedMenu();
+  }
+}
+
+function handleSpeedButtonKeyDown(event){
+  const key = event.key;
+  if(key === 'ArrowDown' || key === 'ArrowUp' || key === 'Enter' || key === ' ' || key === 'Spacebar'){
+    event.preventDefault();
+    if(!viewerState.speedMenuOpen){
+      openSpeedMenu();
+      focusCurrentSpeedOption();
+    }
+  } else if(key === 'Escape' && viewerState.speedMenuOpen){
+    event.preventDefault();
+    closeSpeedMenu();
+  }
+}
+
+function handleSpeedOptionKeyDown(event){
+  const options = viewerState.ui.speedOptions || [];
+  const count = options.length;
+  if(count === 0) return;
+  const current = event.currentTarget;
+  const index = options.indexOf(current);
+  switch(event.key){
+    case 'ArrowDown':
+    case 'ArrowRight': {
+      event.preventDefault();
+      const next = options[(index + 1) % count];
+      if(next) next.focus();
+      break;
+    }
+    case 'ArrowUp':
+    case 'ArrowLeft': {
+      event.preventDefault();
+      const prev = options[(index - 1 + count) % count];
+      if(prev) prev.focus();
+      break;
+    }
+    case 'Home': {
+      event.preventDefault();
+      options[0]?.focus();
+      break;
+    }
+    case 'End': {
+      event.preventDefault();
+      options[count - 1]?.focus();
+      break;
+    }
+    case 'Escape': {
+      event.preventDefault();
+      closeSpeedMenu();
+      break;
+    }
+  }
+}
+
+function handleSpeedMenuOutsidePointer(event){
+  const { speedButton, speedMenu } = viewerState.ui;
+  if(!viewerState.speedMenuOpen || !speedMenu) return;
+  const target = event.target;
+  if(speedMenu.contains(target) || (speedButton && speedButton.contains(target))){
+    return;
+  }
+  closeSpeedMenu({ focusButton: false });
+}
+
+function handleSpeedMenuKeyDown(event){
+  if(event.key === 'Escape' && viewerState.speedMenuOpen){
+    event.preventDefault();
+    closeSpeedMenu();
+  }
+}
+
+function handleSpeedMenuFocusOut(event){
+  if(!viewerState.speedMenuOpen) return;
+  const { speedMenu, speedButton } = viewerState.ui;
+  if(!speedMenu) return;
+  const next = event.relatedTarget;
+  if(next && (speedMenu.contains(next) || (speedButton && speedButton.contains(next)))){
+    return;
+  }
+  closeSpeedMenu({ focusButton: false });
+}
+
+function setupSpeedMenu(){
+  const ui = viewerState.ui;
+  const button = ui.speedButton;
+  const menu = document.getElementById('e4-speed-menu');
+  ui.speedMenu = menu;
+  if(!button || !menu) return;
+  if(menu.dataset.bound === 'true'){
+    ui.speedOptions = Array.from(menu.querySelectorAll('.e4-speed-option'));
+    setSpeedOptionsTabIndex(-1);
+    updateSpeedMenuSelection();
+    button.setAttribute('aria-expanded', viewerState.speedMenuOpen ? 'true' : 'false');
+    menu.setAttribute('aria-hidden', viewerState.speedMenuOpen ? 'false' : 'true');
+    return;
+  }
+  menu.innerHTML = '';
+  menu.dataset.bound = 'true';
+  menu.setAttribute('role', 'menu');
+  menu.setAttribute('aria-hidden', 'true');
+  const options = AUTO_PLAY_SPEEDS.map(ms=>{
+    const li = document.createElement('li');
+    li.setAttribute('role', 'none');
+    const option = document.createElement('button');
+    option.type = 'button';
+    option.className = 'e4-speed-option';
+    option.dataset.speed = String(ms);
+    option.textContent = formatSpeedLabel(ms);
+    option.setAttribute('role', 'menuitemradio');
+    option.setAttribute('aria-checked', 'false');
+    option.tabIndex = -1;
+    option.addEventListener('click', ()=>selectAutoPlaySpeed(ms));
+    option.addEventListener('keydown', handleSpeedOptionKeyDown);
+    li.appendChild(option);
+    menu.appendChild(li);
+    return option;
+  });
+  ui.speedOptions = options;
+  setSpeedOptionsTabIndex(-1);
+  updateSpeedMenuSelection();
+  button.addEventListener('click', handleSpeedButtonClick);
+  button.addEventListener('keydown', handleSpeedButtonKeyDown);
+  menu.addEventListener('focusout', handleSpeedMenuFocusOut);
+  button.setAttribute('aria-haspopup', 'menu');
+  button.setAttribute('aria-expanded', 'false');
+  menu.classList.remove('is-open');
+}
+
+function toggleVoice(){
+  if(!viewerState.isVoiceSupported) return;
+  viewerState.isVoiceOn = !viewerState.isVoiceOn;
+  if(!viewerState.isVoiceOn && typeof window !== 'undefined' && window.speechSynthesis){
+    window.speechSynthesis.cancel();
+  }
+  updateVoiceButton();
+  if(viewerState.isVoiceOn){
+    announcePin(viewerState.steps[viewerState.stepIndex]);
+  }
+}
+
+function setStep(index, {announce = true} = {}){
+  const total = viewerState.steps.length;
+  if(total === 0){
+    viewerState.stepIndex = 0;
+    clearViewer();
+    updateProgressIndicators();
+    updateTransportState();
+    updateVoiceButton();
+    if(viewerState.isAutoPlaying){
+      stopAutoPlay();
+    }
+    return;
+  }
+  const clamped = Math.max(0, Math.min(index, total - 1));
+  const previousIndex = viewerState.stepIndex;
+  viewerState.stepIndex = clamped;
+  drawViewer(clamped);
+  updateProgressIndicators();
+  updateTransportState();
+  updateVoiceButton();
+  if(clamped !== previousIndex){
+    const project = State.get().project;
+    if(projectIsSaved(project)){
+      project.lastViewedStep = clamped;
+      project.updatedAt = Date.now();
+      State.persistMeta();
+    }
+  }
+  if(viewerState.isAutoPlaying){
+    scheduleNextStep();
+  }
+  if(announce && viewerState.isVoiceOn){
+    announcePin(viewerState.steps[clamped]);
+  }
+}
+
+function updateProgressIndicators(){
+  const { progressLabel, progressFill, progressBar, prevPinCell, currentPinCell, nextPinCell } = viewerState.ui;
+  const totalSteps = Math.max(viewerState.steps.length - 1, 0);
+  const currentStep = Math.min(viewerState.stepIndex, totalSteps);
+  if(progressLabel){
+    progressLabel.textContent = `Step ${currentStep} / ${totalSteps}`;
+  }
+  if(progressFill){
+    let pct = totalSteps > 0 ? (currentStep / totalSteps) * 100 : 0;
+    pct = Number.isFinite(pct) ? Math.min(Math.max(pct, 0), 100) : 0;
+    progressFill.style.width = pct.toFixed(1) + '%';
+  }
+  if(progressBar){
+    progressBar.setAttribute('aria-valuemin', '0');
+    progressBar.setAttribute('aria-valuemax', String(totalSteps));
+    progressBar.setAttribute('aria-valuenow', String(currentStep));
+  }
+  const prevValue = viewerState.steps[viewerState.stepIndex - 1];
+  const currentValue = viewerState.steps[viewerState.stepIndex];
+  const nextValue = viewerState.steps[viewerState.stepIndex + 1];
+
+  updateStepCell(prevPinCell, prevValue);
+  updateStepCell(currentPinCell, currentValue);
+  updateStepCell(nextPinCell, nextValue);
+
+  if(prevPinCell){
+    prevPinCell.classList.toggle('is-active', false);
+    prevPinCell.classList.toggle('is-empty', !Number.isFinite(prevValue));
+  }
+  if(currentPinCell){
+    const hasCurrentStep = viewerState.stepIndex >= 0 && viewerState.stepIndex < viewerState.steps.length;
+    currentPinCell.classList.toggle('is-active', hasCurrentStep);
+    currentPinCell.classList.toggle('is-empty', !Number.isFinite(currentValue));
+  }
+  if(nextPinCell){
+    nextPinCell.classList.toggle('is-active', false);
+    nextPinCell.classList.toggle('is-empty', !Number.isFinite(nextValue));
+  }
+}
+
+function updateStepCell(cell, value){
+  if(!cell) return;
+  const valueEl = cell.querySelector('[data-value]');
+  const placeholderEl = cell.querySelector('[data-placeholder]');
+  if(Number.isFinite(value)){
+    if(valueEl){ valueEl.hidden = false; valueEl.textContent = value; }
+    if(placeholderEl){ placeholderEl.hidden = true; }
+    cell.classList.remove('is-empty');
+  } else {
+    if(valueEl){ valueEl.hidden = true; valueEl.textContent = ''; }
+    if(placeholderEl){ placeholderEl.hidden = false; }
+    cell.classList.add('is-empty');
+  }
+}
+
+function updateTransportState(){
+  const { firstButton, prevButton, nextButton, lastButton, playButton, speedButton, jumpButton, voiceButton } = viewerState.ui;
+  const total = viewerState.steps.length;
+  const hasData = total > 0 && Number.isFinite(viewerState.pinCount) && viewerState.pinCount > 0;
+  setDisabled(firstButton, !hasData || viewerState.stepIndex <= 0);
+  setDisabled(prevButton, !hasData || viewerState.stepIndex <= 0);
+  setDisabled(nextButton, !hasData || viewerState.stepIndex >= total - 1);
+  setDisabled(lastButton, !hasData || viewerState.stepIndex >= total - 1);
+  setDisabled(playButton, !hasData);
+  setDisabled(speedButton, !hasData);
+  setDisabled(jumpButton, !hasData);
+  if(voiceButton){
+    const voiceDisabled = !hasData || !viewerState.isVoiceSupported;
+    voiceButton.disabled = voiceDisabled;
+    if(voiceDisabled){
+      voiceButton.setAttribute('aria-disabled', 'true');
+    } else {
+      voiceButton.removeAttribute('aria-disabled');
+    }
+  }
+}
+
+function setDisabled(el, disabled){
+  if(!el) return;
+  el.disabled = !!disabled;
+  if(disabled){
+    el.setAttribute('aria-disabled', 'true');
+    if(el === viewerState.ui.speedButton){
+      closeSpeedMenu({ focusButton: false });
+    }
+  } else {
+    el.removeAttribute('aria-disabled');
+  }
+}
+
+function updateSpeedButton(){
+  const { speedButton } = viewerState.ui;
+  if(!speedButton) return;
+  const ms = viewerState.autoPlayDelayMs || AUTO_PLAY_SPEEDS[0];
+  const label = formatSpeedLabel(ms);
+  const valueEl = speedButton.querySelector('.speed-value');
+  if(valueEl){
+    valueEl.textContent = label;
+  }
+  speedButton.setAttribute('aria-label', `Playback speed ${label}`);
+  updateSpeedMenuSelection();
+}
+
+function updatePlayButton(){
+  const { playButton } = viewerState.ui;
+  if(!playButton) return;
+  const isPlaying = viewerState.isAutoPlaying;
+  playButton.setAttribute('aria-pressed', isPlaying ? 'true' : 'false');
+  playButton.setAttribute('aria-label', isPlaying ? 'Pause' : 'Play');
+  const playStateEls = playButton.querySelectorAll('[data-state="play"]');
+  const pauseStateEls = playButton.querySelectorAll('[data-state="pause"]');
+  playStateEls.forEach(el=>{
+    el.toggleAttribute('hidden', isPlaying);
+  });
+  pauseStateEls.forEach(el=>{
+    el.toggleAttribute('hidden', !isPlaying);
+  });
+}
+
+function updateVoiceButton(){
+  const { voiceButton, voiceInfo } = viewerState.ui;
+  if(!voiceButton) return;
+  const icons = {
+    off: voiceButton.querySelector('[data-state="off"]'),
+    on: voiceButton.querySelector('[data-state="on"]'),
+    unavailable: voiceButton.querySelector('[data-state="unavailable"]')
+  };
+  const labelEl = voiceButton.querySelector('[data-voice-label]');
+  const setActiveState = state => {
+    Object.entries(icons).forEach(([key, icon])=>{
+      if(!icon) return;
+      const isActive = key === state;
+      icon.classList.toggle('is-active', isActive);
+      if(isActive){
+        icon.removeAttribute('hidden');
+      } else {
+        icon.setAttribute('hidden', '');
+      }
+    });
+  };
+  if(!viewerState.isVoiceSupported){
+    voiceButton.disabled = true;
+    voiceButton.setAttribute('aria-pressed', 'false');
+    voiceButton.setAttribute('aria-disabled', 'true');
+    voiceButton.classList.remove('is-on');
+    setActiveState('unavailable');
+    const label = 'Voice unavailable';
+    voiceButton.setAttribute('aria-label', label);
+    if(labelEl){
+      labelEl.textContent = label;
+    }
+    if(voiceInfo){
+      voiceInfo.hidden = false;
+    }
+    return;
+  }
+  const hasSteps = viewerState.steps.length > 0 && Number.isFinite(viewerState.pinCount) && viewerState.pinCount > 0;
+  voiceButton.disabled = !hasSteps;
+  if(!hasSteps){
+    voiceButton.setAttribute('aria-disabled', 'true');
+  } else {
+    voiceButton.removeAttribute('aria-disabled');
+  }
+  const isOn = !!viewerState.isVoiceOn && viewerState.isVoiceSupported;
+  voiceButton.setAttribute('aria-pressed', isOn ? 'true' : 'false');
+  voiceButton.classList.toggle('is-on', isOn);
+  setActiveState(isOn ? 'on' : 'off');
+  const label = isOn ? 'Voice on' : 'Voice off';
+  voiceButton.setAttribute('aria-label', label);
+  if(labelEl){
+    labelEl.textContent = label;
+  }
+  if(voiceInfo){
+    voiceInfo.hidden = true;
+  }
+}
+
+function announcePin(pinNumber){
+  if(!viewerState.isVoiceSupported || !viewerState.isVoiceOn) return;
+  if(!Number.isFinite(pinNumber)) return;
+  try{
+    if(typeof window !== 'undefined' && window.speechSynthesis){
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(`Pin ${pinNumber}`);
+      utterance.lang = 'en-US';
+      window.speechSynthesis.speak(utterance);
+    }
+  } catch(err){
+    // ignore speech synthesis errors
+  }
+}
+
+function clearViewer(){
+  const canvas = viewerState.ui.canvas || document.getElementById('viewer-canvas');
+  if(!canvas) return;
+  const ctx = canvas.getContext('2d');
+  if(ctx) ctx.clearRect(0,0,canvas.width,canvas.height);
+}
+
+function applyViewerSteps(steps, pinCount, {announce = false, initialIndex} = {}){
+  const normalizedSteps = Array.isArray(steps) ? steps.filter(n=>Number.isFinite(n)) : [];
+  const normalizedPinCount = Number.isFinite(pinCount) ? pinCount : 0;
+  stopAutoPlay();
+  viewerState.steps = normalizedSteps;
+  viewerState.pinCount = normalizedPinCount;
+  viewerState.stepIndex = 0;
+  updateSpeedButton();
+  updatePlayButton();
+  const shouldAnnounce = announce && normalizedSteps.length>0 && normalizedPinCount>0;
+  let targetIndex = initialIndex;
+  if(!Number.isFinite(targetIndex)){
+    const project = State.get().project;
+    if(projectIsSaved(project)){
+      targetIndex = project.lastViewedStep ?? 0;
+    } else {
+      targetIndex = 0;
+    }
+  }
+  targetIndex = Math.max(0, Math.floor(targetIndex));
+  setStep(targetIndex, { announce: shouldAnnounce && targetIndex <= 0 });
+  updateProjectSaveUI();
+}
 
 export function mount(){
   navButtons = Array.from(document.querySelectorAll('.app-nav [data-nav]'));
@@ -29,21 +639,39 @@ function setActiveNav(screenId){
       btn.removeAttribute('aria-current');
     }
   });
+  if(target === 4){
+    const triggerDraw = ()=>drawViewer(viewerState.stepIndex);
+    if(typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function'){
+      window.requestAnimationFrame(triggerDraw);
+    } else {
+      setTimeout(triggerDraw, 0);
+    }
+  }
 }
 
 function refreshProjectList(){
   const ul = document.getElementById('project-list'); ul.innerHTML = '';
-  State.listProjects().forEach(p=>{
+  State.listProjects().filter(p=>projectIsSaved(p)).forEach(p=>{
     const li=document.createElement('li');
     li.innerHTML=`<span>${p.name}</span><span class="tiny">${new Date(p.updatedAt).toLocaleString()}</span>`;
-    li.addEventListener('click', ()=>{ State.setProject(p); hydrateProjectView(); State.go(3); });
+    li.addEventListener('click', ()=>{
+      State.setProject(p);
+      hydrateProjectView();
+      State.go(4);
+      refreshProjectList();
+    });
     ul.appendChild(li);
   });
 }
 
 function hydrateProjectView(){
   const p = State.get().project;
-  if(!p) return;
+  if(!p){
+    updateProjectSaveUI();
+    return;
+  }
+
+  updateProjectSaveUI();
 
   const params = p.params || {};
   const setValue = (id, value)=>{
@@ -65,8 +693,6 @@ function hydrateProjectView(){
   setValue('p-color', params.color);
   setValue('p-board', params.board);
 
-  const slider=document.getElementById('e4-step');
-  const counter=document.getElementById('e4-count');
   const renderCanvas=document.getElementById('render-canvas');
   const viewerCanvas=document.getElementById('viewer-canvas');
 
@@ -86,18 +712,11 @@ function hydrateProjectView(){
     }
   }
 
-  const maxStep = steps.length>0 ? steps.length-1 : 0;
-  if(slider){
-    slider.max = maxStep;
-    slider.value = maxStep;
-  }
-  if(counter){
-    counter.textContent = steps.length + ' steps';
-  }
+  const hasDrawable = steps.length>0 && hasPins && p.size;
+  const resumeIndex = projectIsSaved(p) ? (p.lastViewedStep ?? 0) : 0;
+  applyViewerSteps(hasDrawable ? steps : [], hasPins ? pinCount : 0, {announce:false, initialIndex: resumeIndex});
 
-  if(steps.length>0 && hasPins && p.size){
-    drawViewer(maxStep);
-  } else if(viewerCanvas){
+  if(!hasDrawable && viewerCanvas){
     const vctx=viewerCanvas.getContext('2d');
     if(vctx) vctx.clearRect(0,0,viewerCanvas.width, viewerCanvas.height);
   }
@@ -106,6 +725,7 @@ function hydrateProjectView(){
 async function onPickImage(e){
   const f = e.target.files && e.target.files[0]; if(!f) return;
   State.newProjectFromImage(f);
+  updateProjectSaveUI();
   const url = URL.createObjectURL(f); const img = new Image();
   img.onload = ()=>{ crop.img=img; State.go(2); drawCrop(); }; img.src = url;
 }
@@ -188,7 +808,7 @@ function bindCrop(){
     proj.size=SIZE; proj.circle={cx:SIZE/2, cy:SIZE/2, r:(SIZE/2)-BOARD_MARGIN};
     proj.view={scale:crop.scale, tx:exportTx, ty:exportTy, rot:crop.rot};
     proj.rasterBlobId = proj.id + '.raster'; proj.updatedAt = Date.now();
-    await State.saveRasterBlob(proj.rasterBlobId, blob); State.persistMeta(); State.go(3);
+    await State.saveRasterBlob(proj.rasterBlobId, blob); State.persistMeta(); syncProjectMetaUI(); State.go(3);
   });
 }
 
@@ -299,24 +919,23 @@ function bindGenerate(){
         }
       } else if(type==='result'){
         const p=State.get().project;
-        p.stepsCSV=data.steps.join(','); p.stepCount=data.steps.length; p.updatedAt=Date.now(); State.persistMeta();
+        const newStepCount = data.steps.length;
+        p.stepsCSV=data.steps.join(','); p.stepCount=newStepCount; p.updatedAt=Date.now();
+        if(!Number.isFinite(p.lastViewedStep) || p.lastViewedStep < 0){
+          p.lastViewedStep = 0;
+        }
+        const maxValidIndex = Math.max(0, newStepCount - 1);
+        if(p.lastViewedStep > maxValidIndex){
+          p.lastViewedStep = maxValidIndex;
+        }
+        State.persistMeta(); syncProjectMetaUI();
         bar.style.width='100%'; stat.textContent='Done in ' + data.durationMs + ' ms';
         renderPinsAndStrings(rc, data.size, data.pins, data.steps, p.params);
         previewState.pins = data.pins;
         previewState.size = data.size;
         previewState.lastCount = data.steps.length;
         previewState.renderedStep = data.steps.length-1;
-        const sliderEl=document.getElementById('e4-step');
-        const counterEl=document.getElementById('e4-count');
-        const maxStep=Math.max(data.steps.length-1,0);
-        if(sliderEl){
-          sliderEl.max=maxStep;
-          sliderEl.value=maxStep;
-          if(data.steps.length>0) drawViewer(maxStep);
-        }
-        if(counterEl){
-          counterEl.textContent=data.steps.length + ' steps';
-        }
+        applyViewerSteps(data.steps, p.params.pins, {announce:false, initialIndex: p.lastViewedStep ?? 0});
       } else if(type==='status'){
         if(data.state==='paused'){
           stat.textContent='Paused';
@@ -356,30 +975,189 @@ function bindGenerate(){
 }
 
 function bindViewer(){
-  const slider=document.getElementById('e4-step'); const canvas=document.getElementById('viewer-canvas');
-  const expPNG=document.getElementById('exp-png'); const expSVGb=document.getElementById('exp-svg'); const expCSVb=document.getElementById('exp-csv'); const expJSONb=document.getElementById('exp-json');
+  const ui = viewerState.ui;
+  ui.canvas = document.getElementById('viewer-canvas');
+  ui.saveButton = document.getElementById('save-project');
+  ui.firstButton = document.getElementById('e4-first');
+  ui.prevButton = document.getElementById('e4-prev');
+  ui.playButton = document.getElementById('e4-play');
+  ui.nextButton = document.getElementById('e4-next');
+  ui.lastButton = document.getElementById('e4-last');
+  ui.speedButton = document.getElementById('e4-speed');
+  ui.speedMenu = document.getElementById('e4-speed-menu');
+  ui.voiceButton = document.getElementById('e4-voice');
+  ui.jumpButton = document.getElementById('e4-step-jump');
+  ui.progressFill = document.getElementById('e4-progress-fill');
+  ui.progressLabel = document.getElementById('e4-progress-label');
+  ui.progressBar = document.querySelector('.e4-progress-bar');
+  ui.prevPinCell = document.getElementById('e4-prev-pin');
+  ui.currentPinCell = document.getElementById('e4-current-pin');
+  ui.nextPinCell = document.getElementById('e4-next-pin');
 
-  slider.addEventListener('input', ()=>drawViewer(+slider.value));
-  expPNG.addEventListener('click', ()=>{ const url=canvas.toDataURL('image/png'); downloadURL(url,'string-art.png'); });
-  expSVGb.addEventListener('click', ()=>{ const p=State.get().project; const steps=p.stepsCSV.split(',').map(s=>+s); const blob=exportSVG(p.size, buildPins(p.size, p.params.pins), steps, p.params); const url=URL.createObjectURL(blob); downloadURL(url,'string-art.svg'); URL.revokeObjectURL(url); });
-  expCSVb.addEventListener('click', ()=>{ const p=State.get().project; const steps=p.stepsCSV.split(',').map(s=>+s); const blob=exportCSV(steps, buildPins(p.size, p.params.pins)); const url=URL.createObjectURL(blob); downloadURL(url,'string-art.csv'); URL.revokeObjectURL(url); });
-  expJSONb.addEventListener('click', ()=>{ const p=State.get().project; const preset={brand:'Hammer Design', pins:p.params.pins, strings:p.params.strings, minDist:p.params.minDist, fade:p.params.fade, widthPx:p.params.widthPx, alpha:p.params.alpha, color:p.params.color, board:p.params.board, seed:p.params.seed, locale:(navigator.language||'en').slice(0,2), watermark:'© 2025 Hammer Design'}; const blob=new Blob([JSON.stringify(preset,null,2)], {type:'application/json'}); const url=URL.createObjectURL(blob); downloadURL(url,'preset.json'); URL.revokeObjectURL(url); });
+  setupSpeedMenu();
+
+  const canvas = ui.canvas;
+  const expPNG = document.getElementById('exp-png');
+  const expSVGb = document.getElementById('exp-svg');
+  const expCSVb = document.getElementById('exp-csv');
+  const expJSONb = document.getElementById('exp-json');
+  ui.exportButtons = [expPNG, expSVGb, expCSVb, expJSONb].filter(Boolean);
+
+  if(ui.saveButton){
+    ui.saveButton.addEventListener('click', ()=>{
+      const proj = State.get().project;
+      if(!proj) return;
+      const defaultName = (proj.name || '').trim() || 'Untitled';
+      const input = prompt('Save project as', defaultName);
+      if(input === null) return;
+      const trimmed = input.trim();
+      const newName = trimmed || defaultName;
+      proj.name = newName;
+      proj.isSaved = true;
+      proj.updatedAt = Date.now();
+      State.persistMeta();
+      syncProjectMetaUI();
+    });
+  }
+
+  if(viewerResizeObserver){
+    viewerResizeObserver.disconnect();
+    viewerResizeObserver = null;
+  }
+  viewerLastObservedWidth = 0;
+  if(canvas && typeof ResizeObserver !== 'undefined'){
+    const target = canvas.parentElement || canvas;
+    if(target){
+      viewerResizeObserver = new ResizeObserver(entries=>{
+        for(const entry of entries){
+          const rect = entry.contentRect || {};
+          const width = Math.round(rect.width || entry.target.clientWidth || 0);
+          if(width <= 0){
+            continue;
+          }
+          const shouldDraw = viewerPendingDraw || width !== viewerLastObservedWidth;
+          viewerLastObservedWidth = width;
+          if(shouldDraw){
+            drawViewer(viewerState.stepIndex);
+          }
+        }
+      });
+      viewerResizeObserver.observe(target);
+    }
+  }
+
+  if(ui.firstButton){
+    ui.firstButton.addEventListener('click', ()=>{
+      stopAutoPlay();
+      setStep(0, {announce:true});
+    });
+  }
+  if(ui.lastButton){
+    ui.lastButton.addEventListener('click', ()=>{
+      stopAutoPlay();
+      setStep(viewerState.steps.length - 1, {announce:true});
+    });
+  }
+  if(ui.prevButton){
+    ui.prevButton.addEventListener('click', ()=>{
+      stopAutoPlay();
+      setStep(viewerState.stepIndex - 1, {announce:true});
+    });
+  }
+  if(ui.nextButton){
+    ui.nextButton.addEventListener('click', ()=>{
+      stopAutoPlay();
+      setStep(viewerState.stepIndex + 1, {announce:true});
+    });
+  }
+  if(ui.playButton){ ui.playButton.addEventListener('click', toggleAutoPlay); }
+  if(ui.voiceButton){ ui.voiceButton.addEventListener('click', toggleVoice); }
+  if(ui.jumpButton){
+    ui.jumpButton.addEventListener('click', ()=>{
+      if(viewerState.steps.length===0) return;
+      const maxIndex = viewerState.steps.length - 1;
+      const input = prompt(`Go to step (0-${maxIndex})`, String(viewerState.stepIndex));
+      if(input===null) return;
+      const num = Number.parseInt(input, 10);
+      if(Number.isFinite(num)){
+        const clamped = Math.max(0, Math.min(num, maxIndex));
+        stopAutoPlay();
+        setStep(clamped, {announce:true});
+      }
+    });
+  }
+
+  if(ui.voiceButton && !viewerState.isVoiceSupported){
+    if(!ui.voiceInfo){
+      const info = document.createElement('span');
+      info.className = 'tiny e4-voice-info';
+      info.textContent = 'Speech synthesis not supported in this browser.';
+      ui.voiceButton.insertAdjacentElement('afterend', info);
+      ui.voiceInfo = info;
+    } else {
+      ui.voiceInfo.hidden = false;
+    }
+  }
+
+  if(expPNG){ expPNG.addEventListener('click', ()=>{ if(!canvas) return; const url=canvas.toDataURL('image/png'); downloadURL(url,'string-art.png'); }); }
+  if(expSVGb){ expSVGb.addEventListener('click', ()=>{ const p=State.get().project; if(!p) return; const steps=(p.stepsCSV||'').split(',').map(s=>+s).filter(n=>Number.isFinite(n)); const blob=exportSVG(p.size, buildPins(p.size, p.params.pins), steps, p.params); const url=URL.createObjectURL(blob); downloadURL(url,'string-art.svg'); URL.revokeObjectURL(url); }); }
+  if(expCSVb){ expCSVb.addEventListener('click', ()=>{ const p=State.get().project; if(!p) return; const steps=(p.stepsCSV||'').split(',').map(s=>+s).filter(n=>Number.isFinite(n)); const blob=exportCSV(steps, buildPins(p.size, p.params.pins)); const url=URL.createObjectURL(blob); downloadURL(url,'string-art.csv'); URL.revokeObjectURL(url); }); }
+  if(expJSONb){ expJSONb.addEventListener('click', ()=>{ const p=State.get().project; if(!p) return; const preset={brand:'Hammer Design', pins:p.params.pins, strings:p.params.strings, minDist:p.params.minDist, fade:p.params.fade, widthPx:p.params.widthPx, alpha:p.params.alpha, color:p.params.color, board:p.params.board, seed:p.params.seed, locale:(navigator.language||'en').slice(0,2), watermark:'© 2025 Hammer Design'}; const blob=new Blob([JSON.stringify(preset,null,2)], {type:'application/json'}); const url=URL.createObjectURL(blob); downloadURL(url,'preset.json'); URL.revokeObjectURL(url); }); }
 
   function downloadURL(url,name){ const a=document.createElement('a'); a.href=url; a.download=name; a.click(); }
+
+  if(viewerState.steps.length === 0){
+    resetViewer();
+  } else {
+    updateProgressIndicators();
+    updateTransportState();
+    updateSpeedButton();
+    updateVoiceButton();
+    updatePlayButton();
+  }
+
+  updateProjectSaveUI();
 }
 
-function drawViewer(k){
-  const p=State.get().project; if(!p) return;
-  const stepsCSV=(p.stepsCSV||'').trim();
-  if(!stepsCSV) return;
-  const canvas=document.getElementById('viewer-canvas'); if(!canvas) return;
-  const allSteps=stepsCSV.split(',').map(s=>Number(s)).filter(n=>Number.isFinite(n));
-  if(allSteps.length===0) return;
-  const pinCount=Number(p.params?.pins);
-  if(!Number.isFinite(pinCount) || pinCount<=0 || !p.size) return;
-  const steps=allSteps.slice(0, Math.min(k+1, allSteps.length));
-  const pins=buildPins(p.size, pinCount);
-  renderPinsAndStrings(canvas, p.size, pins, steps, p.params);
+function drawViewer(stepIndex){
+  const p = State.get().project;
+  const canvas = viewerState.ui.canvas || document.getElementById('viewer-canvas');
+  if(!p || !canvas){
+    clearViewer();
+    viewerPendingDraw = false;
+    return;
+  }
+
+  const steps = viewerState.steps;
+  const pinCountCandidate = Number.isFinite(viewerState.pinCount) && viewerState.pinCount>0 ? viewerState.pinCount : Number(p.params?.pins);
+  const pinCount = Number(pinCountCandidate);
+
+  if(!Array.isArray(steps) || steps.length===0 || !Number.isFinite(pinCount) || pinCount<=0 || !p.size){
+    clearViewer();
+    viewerPendingDraw = false;
+    return;
+  }
+
+  const parent = canvas.parentElement;
+  if(!parent){
+    clearViewer();
+    viewerPendingDraw = false;
+    return;
+  }
+
+  const cssSize = parent.clientWidth || 0;
+  if(!(cssSize > 0)){
+    viewerPendingDraw = true;
+    return;
+  }
+
+  viewerPendingDraw = false;
+  viewerLastObservedWidth = Math.round(cssSize);
+
+  const clamped = Math.max(0, Math.min(stepIndex, steps.length-1));
+  const subset = steps.slice(0, clamped+1);
+  const pins = buildPins(p.size, pinCount);
+  renderPinsAndStrings(canvas, p.size, pins, subset, p.params);
 }
 
 function buildPins(size, n){
