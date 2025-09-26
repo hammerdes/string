@@ -46,6 +46,40 @@ const viewerState = {
   ui: {},
 };
 
+const generatorUI = {
+  startButton: null,
+  pauseButton: null,
+  resumeButton: null,
+  cancelButton: null,
+  statusLabel: null,
+};
+
+function setGeneratorButtonDisabled(button, disabled){
+  if(!button) return;
+  button.disabled = disabled;
+  button.setAttribute('aria-disabled', disabled ? 'true' : 'false');
+}
+
+function syncGeneratorControlsToProject(){
+  const project = State.get().project;
+  const hasProject = !!(project && project.rasterBlobId);
+  const shouldDisable = !hasProject;
+  setGeneratorButtonDisabled(generatorUI.startButton, shouldDisable);
+  setGeneratorButtonDisabled(generatorUI.pauseButton, shouldDisable);
+  setGeneratorButtonDisabled(generatorUI.resumeButton, shouldDisable);
+  setGeneratorButtonDisabled(generatorUI.cancelButton, shouldDisable);
+  if(shouldDisable && generatorUI.statusLabel){
+    generatorUI.statusLabel.textContent = 'Load a project to enable generation.';
+  }
+  return hasProject;
+}
+
+function showGeneratorMessage(message){
+  if(generatorUI.statusLabel){
+    generatorUI.statusLabel.textContent = message;
+  }
+}
+
 function projectIsSaved(proj){
   return !!(proj && proj.isSaved !== false);
 }
@@ -1054,6 +1088,7 @@ async function ensureProjectPreview(proj){
 
 function hydrateProjectView(){
   const p = State.get().project;
+  syncGeneratorControlsToProject();
   if(!p){
     updateProjectSaveUI();
     return;
@@ -1275,6 +1310,13 @@ function bindGenerate(){
   const stat=document.getElementById('gen-status');
   const rc=document.getElementById('render-canvas');
 
+  generatorUI.startButton = btnStart;
+  generatorUI.pauseButton = btnPause;
+  generatorUI.resumeButton = btnResume;
+  generatorUI.cancelButton = btnCancel;
+  generatorUI.statusLabel = stat;
+  syncGeneratorControlsToProject();
+
   let worker=null;
   const previewState = { pins:null, size:null, lastCount:0, renderedStep:0 };
   function resetPreviewState(){
@@ -1339,22 +1381,59 @@ function bindGenerate(){
   }
 
   btnStart.addEventListener('click', async ()=>{
-    const p=State.get().project;
-    resetPreviewState();
-    p.params.pins=+document.getElementById('p-pins').value;
-    p.params.strings=+document.getElementById('p-steps').value;
-    p.params.minDist=+document.getElementById('p-mindist').value;
-    p.params.fade=+document.getElementById('p-fade').value;
-    p.params.seed=+document.getElementById('p-seed').value;
-    p.params.widthPx=+document.getElementById('p-width').value;
-    p.params.alpha=+document.getElementById('p-alpha').value;
-    p.params.color=document.getElementById('p-color').value;
-    p.params.board=document.getElementById('p-board').value;
+    const project = State.get().project;
+    if(!project){
+      showGeneratorMessage('Load or create a project before generating.');
+      bar.style.width='0%';
+      syncGeneratorControlsToProject();
+      return;
+    }
+    if(!project.rasterBlobId){
+      showGeneratorMessage('Project is missing its source image. Please import and crop an image first.');
+      bar.style.width='0%';
+      syncGeneratorControlsToProject();
+      return;
+    }
 
-    const blob = await State.loadRasterBlob(p.rasterBlobId);
-    const buf = await blob.arrayBuffer();
+    resetPreviewState();
+    const params = project.params = { ...(project.params || {}) };
+    params.pins=+document.getElementById('p-pins').value;
+    params.strings=+document.getElementById('p-steps').value;
+    params.minDist=+document.getElementById('p-mindist').value;
+    params.fade=+document.getElementById('p-fade').value;
+    params.seed=+document.getElementById('p-seed').value;
+    params.widthPx=+document.getElementById('p-width').value;
+    params.alpha=+document.getElementById('p-alpha').value;
+    params.color=document.getElementById('p-color').value;
+    params.board=document.getElementById('p-board').value;
+
+    let blob;
+    try{
+      blob = await State.loadRasterBlob(project.rasterBlobId);
+    }catch(err){
+      console.error('Failed to load raster blob', err);
+      showGeneratorMessage('Unable to load the project image. Please try reopening the project.');
+      bar.style.width='0%';
+      return;
+    }
+    if(!blob){
+      showGeneratorMessage('Unable to find the project image. Please re-import the image and try again.');
+      bar.style.width='0%';
+      return;
+    }
+
+    let buf;
+    try{
+      buf = await blob.arrayBuffer();
+    }catch(err){
+      console.error('Failed to read raster blob', err);
+      showGeneratorMessage('Unable to read the project image. Please try reopening the project.');
+      bar.style.width='0%';
+      return;
+    }
+
     const u8 = new Uint8ClampedArray(buf);
-    ensureWorker().postMessage({type:'run', data:{ raster:u8, size:p.size, pins:p.params.pins, minDist:p.params.minDist, fade:p.params.fade, maxSteps:p.params.strings }}, [u8.buffer]);
+    ensureWorker().postMessage({type:'run', data:{ raster:u8, size:project.size, pins:params.pins, minDist:params.minDist, fade:params.fade, maxSteps:params.strings }}, [u8.buffer]);
     bar.style.width='0%'; stat.textContent='Running';
   });
   btnPause.addEventListener('click', ()=>ensureWorker().postMessage({type:'pause'}));
