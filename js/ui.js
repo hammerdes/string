@@ -858,9 +858,10 @@ function createProjectListItem(proj){
 }
 
 function formatProjectStepLabel(proj){
-  const total = Number.isFinite(proj.stepCount) ? Math.max(0, Math.floor(proj.stepCount)) : 0;
-  const last = Number.isFinite(proj.lastViewedStep) ? Math.max(0, Math.floor(proj.lastViewedStep)) : 0;
-  const current = total > 0 ? Math.min(last + 1, total) : 0;
+  const rawTotal = Number.isFinite(proj.stepCount) ? Math.floor(proj.stepCount) : 0;
+  const total = Math.max(0, rawTotal - 1);
+  const rawCurrent = Number.isFinite(proj.lastViewedStep) ? Math.floor(proj.lastViewedStep) : 0;
+  const current = Math.min(Math.max(rawCurrent, 0), total);
   const currentLabel = current.toLocaleString();
   const totalLabel = total.toLocaleString();
   return `Current step ${currentLabel} / ${totalLabel}`;
